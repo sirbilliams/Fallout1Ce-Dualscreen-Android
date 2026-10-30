@@ -165,6 +165,14 @@ android {
             // Release signing config is optional and might not be present in CI
             // builds, hence `findByName`.
             signingConfig signingConfigs.findByName('release') ?: signingConfigs.debug
+
+            // Pin CMake's build type (AGP defaults release to RelWithDebInfo), so the
+            // native build lands where nativeBuildDirNames expects it.
+            externalNativeBuild {
+                cmake {
+                    arguments '-DCMAKE_BUILD_TYPE=Release'
+                }
+            }
         }
     }
 
