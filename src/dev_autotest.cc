@@ -13,7 +13,15 @@
 #include "bottom_screen.h"
 #include "game/inventry.h"
 #include "game/loadsave.h"
+#include "game/config.h"
+#include "game/gconfig.h"
+#include "game/game.h"
 #include "game/pipboy.h"
+#include "game/editor.h"
+#include "game/gdialog.h"
+#include "game/worldmap.h"
+#include "game/map.h"
+#include "game/scripts.h"
 #include "game/item.h"
 #include "game/object.h"
 #include "mobile_contracts.h"
@@ -123,6 +131,47 @@ bool scenes(const char* dir, int width, int height, bool game);
 
 namespace {
 
+    // Classic (original) screens: a timer on SDL's thread captures the game
+    // frame while the screen's own loop blocks the game thread, then sends
+    // Escape (and a few more keys) to close it.
+    std::string gClassicPath;
+    int gClassicStep = 0;
+    bool gClassicQuit = false;
+
+    void pushKey(SDL_Scancode code)
+    {
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = SDL_KEYDOWN;
+        event.key.state = SDL_PRESSED;
+        event.key.keysym.scancode = code;
+        event.key.keysym.sym = SDL_GetKeyFromScancode(code);
+        SDL_PushEvent(&event);
+        event.type = SDL_KEYUP;
+        event.key.state = SDL_RELEASED;
+        SDL_PushEvent(&event);
+    }
+
+    Uint32 classicTimer(Uint32, void*)
+    {
+        if (gClassicStep++ == 0) {
+            SDL_SaveBMP(gSdlTextureSurface, gClassicPath.c_str());
+            return 300;
+        }
+        if (gClassicQuit) game_user_wants_to_quit = 1;
+        pushKey(SDL_SCANCODE_ESCAPE);
+        if (gClassicStep > 12) return 0;
+        return 400;
+    }
+
+    void classicShot(const char* dir, const char* name, int delayMs)
+    {
+        gClassicPath = std::string(dir) + "/" + name + "-top.bmp";
+        gClassicStep = 0;
+        SDL_InitSubSystem(SDL_INIT_TIMER);
+        SDL_AddTimer(delayMs, classicTimer, nullptr);
+    }
+
     std::string gLiveDir;
     int gLiveWidth = 0;
     int gLiveHeight = 0;
@@ -231,6 +280,43 @@ bool devAutotestGameRun()
     SDL_AddTimer(2500, liveTimer, nullptr);
     int pipRc = pipboy(PIPBOY_OPEN_INTENT_UNSPECIFIED);
     SDL_Log("autotest: pipboy returned %d", pipRc);
+
+    // Classic screens on the top surface (touch faces switched off).
+    config_set_value(&game_config, "touch", "enabled", 0);
+    classicShot(dir, "20-classic-inventory", 2000);
+    handle_inventory();
+    classicShot(dir, "21-classic-character-editor", 3000);
+    editor_design(false);
+    gClassicQuit = true; // the world map only leaves via a town or quit
+    classicShot(dir, "22-classic-worldmap", 3000);
+    {
+        WorldMapContext ctx;
+        ctx.state = 0;
+        ctx.town = our_town;
+        ctx.section = 0;
+        world_map(ctx);
+        KillWorldWin();
+    }
+    gClassicQuit = false;
+    game_user_wants_to_quit = 0;
+    classicShot(dir, "23-classic-pipboy", 2500);
+    pipboy(PIPBOY_OPEN_INTENT_UNSPECIFIED);
+    {
+        const char* dlgMap = getenv("FALLOUT_AUTOTEST_DIALOGUE_MAP");
+        static char mapName[64];
+        snprintf(mapName, sizeof(mapName), "%s", dlgMap != nullptr ? dlgMap : "SHADYW.MAP");
+        int mrc = map_load(mapName);
+        SDL_Log("autotest: map_load(%s) = %d", mapName, mrc);
+    }
+    for (Object* obj = obj_find_first(); obj != nullptr; obj = obj_find_next()) {
+        if (obj == obj_dude || obj->sid == -1 || PID_TYPE(obj->pid) != OBJ_TYPE_CRITTER) continue;
+        SDL_Log("autotest: dialogue with pid %x", obj->pid);
+        obj_move_to_tile(obj_dude, obj->tile + 2, obj->elevation, nullptr);
+        classicShot(dir, "24-classic-dialogue", 4000);
+        gdialog_enter(obj, 0);
+        break;
+    }
+    config_set_value(&game_config, "touch", "enabled", 1);
     bottomScreenSetTest(0, 0, 1.0f);
     return rc == 0;
 }

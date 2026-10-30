@@ -185,6 +185,11 @@ static bool createRenderer(int width, int height)
         return false;
     }
 
+#ifdef __ANDROID__
+    // Largest whole-number scale that fits (960x540 -> 2x on 1920x1080).
+    SDL_RenderSetIntegerScale(gSdlRenderer, SDL_TRUE);
+#endif
+
     gSdlTexture = SDL_CreateTexture(gSdlRenderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, width, height);
     if (gSdlTexture == NULL) {
         return false;

@@ -149,6 +149,26 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
     video_options.fullscreen = true;
     video_options.scale = 1;
 
+    // Default: 16:9 widescreen (960x540, shown at an integer 2x on a 1920x1080
+    // surface such as the AYN Thor top screen). On Android always; on desktop
+    // only when the display is 16:9. f1_res.ini overrides either.
+    bool defaultWidescreen = false;
+#ifdef __ANDROID__
+    defaultWidescreen = true;
+#else
+    if (SDL_InitSubSystem(SDL_INIT_VIDEO) == 0) {
+        SDL_DisplayMode mode;
+        if (SDL_GetDesktopDisplayMode(0, &mode) == 0 && mode.h > 0
+            && mode.w * 9 == mode.h * 16 && mode.w >= 1280) {
+            defaultWidescreen = true;
+        }
+    }
+#endif
+    if (defaultWidescreen) {
+        video_options.width = 960;
+        video_options.height = 540;
+    }
+
     Config resolutionConfig;
     if (config_init(&resolutionConfig)) {
         if (config_load(&resolutionConfig, "f1_res.ini", false)) {
