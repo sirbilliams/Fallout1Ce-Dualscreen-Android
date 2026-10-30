@@ -44,48 +44,104 @@ jobs:
         run: find src -type f -name \*.cc -o -name \*.h | xargs clang-format --dry-run --Werror
 
   android:
-    name: Android
-
+    name: Android APK (arm64 + x86_64)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # to publish the releases
 
     steps:
       - name: Clone
         uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17
           cache: gradle
 
       - name: Cache cmake build
         uses: actions/cache@v4
         with:
           path: os/android/app/.cxx
-          key: android-cmake-v1
+          key: android-f1-sdl2328-v1
 
-      - name: Setup signing config
-        if: env.KEYSTORE_FILE_BASE64 != '' && env.KEYSTORE_PROPERTIES_FILE_BASE64 != ''
-        run: |
-          cd os/android
-          echo "$KEYSTORE_FILE_BASE64" | base64 --decode > debug.keystore
-          echo "$KEYSTORE_PROPERTIES_FILE_BASE64" | base64 --decode > debug-keystore.properties
+      # A stable signing key from the repo secrets (THOR_KEYSTORE_B64, the
+      # keystore in base64, and THOR_KEYSTORE_PASSWORD), so each APK installs
+      # over the last one. Without them the APK is signed with a one-off key:
+      # it still installs, but the next one needs the old one uninstalled.
+      - name: Signing key
         env:
-          KEYSTORE_FILE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_FILE_BASE64 }}
-          KEYSTORE_PROPERTIES_FILE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_PROPERTIES_FILE_BASE64 }}
+          KEYSTORE_B64: ${{ secrets.THOR_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.THOR_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            # Pasted secrets often carry a stray newline or space.
+            PW=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d ' \t\r\n')
+            printf '%s' "$KEYSTORE_B64" | tr -d ' \t\r\n' | base64 -d > os/android/thor.keystore
+            if ! keytool -list -keystore os/android/thor.keystore -storepass "$PW" -alias fallout1thor > /dev/null; then
+              echo "::error::THOR_KEYSTORE_B64 / THOR_KEYSTORE_PASSWORD don't open the key: re-paste both secrets"
+              exit 1
+            fi
+            {
+              echo "storeFile=thor.keystore"
+              echo "storePassword=$PW"
+              echo "keyAlias=fallout1thor"
+              echo "keyPassword=$PW"
+            } > os/android/debug-keystore.properties
+            echo "SIGNING=stable" >> "$GITHUB_ENV"
+            echo "stable signing key: yes"
+          else
+            echo "SIGNING=one-off" >> "$GITHUB_ENV"
+            echo "::warning::No THOR_KEYSTORE_B64 / THOR_KEYSTORE_PASSWORD secrets: this APK uses a one-off key"
+          fi
 
-      - name: Build
+      # The phone build: optimized native code, what is played and tested.
+      - name: Build APK
         run: |
           cd os/android
-          ./gradlew assembleDebug
+          timeout 900 ./gradlew --no-daemon assembleDebug
 
-      - name: Upload
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp os/android/app/build/outputs/apk/debug/app-debug.apk out/Fallout1-Dualscreen.apk
+          (cd out && sha256sum Fallout1-Dualscreen.apk > Fallout1-Dualscreen.apk.sha256)
+          "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --verbose out/Fallout1-Dualscreen.apk
+          ls -la out
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: fallout-ce-debug.apk
-          path: os/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          name: Fallout1-Dualscreen-apk
+          path: out/Fallout1-Dualscreen.apk*
+          if-no-files-found: error
+
+      - name: Publish as the latest build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$SIGNING" = "stable" ]; then
+            SIGN_NOTE="Signed with the port's stable key: installs over earlier builds."
+          else
+            SIGN_NOTE="Signed with a one-off key (no signing secrets set yet): uninstall the previous build before installing this one."
+          fi
+          cat > notes.md <<EOF
+          Built automatically from ${GITHUB_SHA::7}: $(git log -1 --format=%s)
+
+          Fallout 1 Community Edition, adapted for dual-screen devices such as the AYN Thor. Installs beside the original app, never over it. No game data inside: you need your own copy of Fallout 1.
+
+          ${SIGN_NOTE}
+
+          Free and non-commercial, under the license in LICENSE.md (LICENSE.md).
+          EOF
+          sed -i 's/^          //' notes.md
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest out/Fallout1-Dualscreen.apk out/Fallout1-Dualscreen.apk.sha256 --prerelease --target "$GITHUB_SHA" \
+            --title "Latest build ($(date -u +%Y-%m-%d) ${GITHUB_SHA::7})" \
+            --notes-file notes.md
+
 
   ios:
     name: iOS
@@ -137,7 +193,7 @@ jobs:
   linux:
     name: Linux (${{ matrix.arch }})
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: false
