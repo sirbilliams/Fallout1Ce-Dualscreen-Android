@@ -9,6 +9,9 @@ namespace fallout {
 // Returns false on failure.
 bool devAutotestRun();
 
+// Same for the screens that need a loaded game (called with a map loaded).
+bool devAutotestGameRun();
+
 } // namespace fallout
 
 #endif

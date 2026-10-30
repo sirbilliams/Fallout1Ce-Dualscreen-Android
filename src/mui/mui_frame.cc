@@ -32,4 +32,63 @@ MuiRect muiScreenFrame(MuiContext& ui, const std::u32string& title, bool* back)
     return { safe.x, bar.bottom() + ui.dp(10.0f), safe.w, safe.bottom() - bar.bottom() - ui.dp(10.0f) };
 }
 
+int muiListView(MuiContext& ui, const std::string& id, const MuiRect& rect, const std::vector<MuiRow>& rows, float rowHeightDp)
+{
+    const MuiTheme& theme = muiTheme();
+    ui.panel(rect);
+    MuiRect inner = rect.inset(ui.dp(6.0f));
+    float rowHeight = ui.dp(rowHeightDp);
+    float offset = ui.scroll(id, inner, rows.size() * rowHeight);
+    int tapped = -1;
+
+    muiPushClip(inner);
+    for (size_t index = 0; index < rows.size(); index++) {
+        const MuiRow& row = rows[index];
+        MuiRect line = { inner.x, inner.y + index * rowHeight - offset, inner.w, rowHeight };
+        if (line.bottom() < inner.y || line.y > inner.bottom()) {
+            continue;
+        }
+        if (row.selected) {
+            muiFillRect(line, theme.selected);
+        }
+        if (!row.header && ui.touchable(id + "." + std::to_string(index), { line.x, std::max(line.y, inner.y), line.w, std::min(line.bottom(), inner.bottom()) - std::max(line.y, inner.y) })) {
+            tapped = static_cast<int>(index);
+        }
+        MuiColor color = row.header ? theme.accent : (row.dim ? theme.textDim : theme.text);
+        float textX = line.x + ui.dp(10.0f);
+        if (row.icon != -1) {
+            float side = rowHeight - ui.dp(6.0f);
+            int artWidth;
+            int artHeight;
+            SDL_Texture* texture = muiArtTexture(row.icon, 0, &artWidth, &artHeight);
+            if (texture != nullptr && artWidth > 0 && artHeight > 0) {
+                SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
+                muiDrawTexture(texture, muiFitRect({ textX, line.y + ui.dp(3.0f), side * 1.3f, side }, static_cast<float>(artWidth), static_cast<float>(artHeight)), { 255, 255, 255, 255 });
+            }
+            textX += side * 1.4f;
+        }
+        float size = ui.dp(row.header ? 15.0f : 17.0f);
+        float rightWidth = row.right.empty() ? 0.0f : muiTextWidth(row.right, size) + ui.dp(12.0f);
+        MuiRect leftRect = { textX, line.y, line.right() - textX - rightWidth - ui.dp(8.0f), line.h };
+        std::u32string left = row.left;
+        while (left.size() > 2 && muiTextWidth(left, size) > leftRect.w) {
+            left.pop_back();
+        }
+        muiDrawTextAligned(left, leftRect, size, color, MuiAlign::Start, MuiAlign::Center);
+        if (!row.right.empty()) {
+            muiDrawTextAligned(row.right, { line.x, line.y, line.w - ui.dp(10.0f), line.h }, size, color, MuiAlign::End, MuiAlign::Center);
+        }
+    }
+    muiPopClip();
+    return tapped;
+}
+
+void muiReadout(MuiContext& ui, const MuiRect& rect, const std::u32string& label, const std::u32string& value)
+{
+    const MuiTheme& theme = muiTheme();
+    float size = ui.dp(17.0f);
+    muiDrawTextAligned(label, rect, size, theme.textDim, MuiAlign::Start, MuiAlign::Center);
+    muiDrawTextAligned(value, rect, size, theme.text, MuiAlign::End, MuiAlign::Center);
+}
+
 } // namespace fallout

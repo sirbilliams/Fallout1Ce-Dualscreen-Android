@@ -333,6 +333,16 @@ void muiOptionsShow();
 void muiOptionsHide();
 int muiOptionsTakeChoice();
 
+// Character sheet (mui_character.cc). Returns -1 when the mobile UI is off
+// (the caller opens the classic editor), 0 when shown and closed, 1 when
+// the player asked for the classic editor.
+int muiCharacterScreenRun();
+
+// Inventory (mui_inventory.cc) of [owner] (the player). -1: mobile UI off
+// (classic window), 0: shown and closed.
+struct Object;
+int muiInventoryScreenRun(Object* owner);
+
 // Called every frame of `muiRunModal` (autotest hook).
 void muiSetModalTick(void (*tick)());
 

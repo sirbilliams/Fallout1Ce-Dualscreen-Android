@@ -1,4 +1,5 @@
 #include "game/inventry.h"
+#include "mui/mui.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -417,6 +418,13 @@ void handle_inventory()
             obj_dude->data.critter.combat.ap -= actionPointsRequired;
             intface_update_move_points(obj_dude->data.critter.combat.ap, combat_free_move);
         }
+    }
+
+    if (inven_dude == obj_dude && muiInventoryScreenRun(inven_dude) == 0) {
+        // NOTE: Uninline.
+        inven_exit();
+        intface_update_items(false);
+        return;
     }
 
     Object* oldArmor = inven_worn(inven_dude);

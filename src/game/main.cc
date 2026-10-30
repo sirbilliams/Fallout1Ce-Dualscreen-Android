@@ -2,6 +2,7 @@
 
 #include "bottom_screen.h"
 #include "dev_autotest.h"
+#include "mui/mui_dash.h"
 #include "mobile_contracts.h"
 #include <cstdlib>
 
@@ -129,6 +130,20 @@ int gnw_main(int argc, char** argv)
                     SDL_Log("dev-autotest failed");
                     std::exit(2);
                 }
+#endif
+#ifndef __ANDROID__
+                main_menu_hide(true);
+                main_menu_destroy();
+                main_load_new(mainMap);
+                muiSetPlaying(true);
+                if (!devAutotestGameRun()) {
+                    SDL_Log("dev-autotest (game) failed");
+                    std::exit(2);
+                }
+                muiSetPlaying(false);
+                main_unload_new();
+                main_reset_system();
+                main_menu_create();
 #endif
                 SDL_Log("dev-autotest: done");
                 mainMenuRc = MAIN_MENU_EXIT;

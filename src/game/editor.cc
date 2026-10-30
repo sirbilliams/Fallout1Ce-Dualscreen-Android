@@ -1,4 +1,5 @@
 #include "game/editor.h"
+#include "mui/mui.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -634,6 +635,10 @@ int editor_design(bool isCreationMode)
     const char* lines[] = { line2 };
 
     glblmode = isCreationMode;
+
+    if (!isCreationMode && muiCharacterScreenRun() == 0) {
+        return 0;
+    }
 
     SavePlayer();
 

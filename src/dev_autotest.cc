@@ -9,9 +9,12 @@
 #include <SDL.h>
 
 #include "bottom_screen.h"
+#include "game/item.h"
+#include "game/object.h"
 #include "mobile_contracts.h"
 #include "mui/mui.h"
 #include "mui/mui_screens.h"
+#include "mui/mui_settings.h"
 #include "plib/gnw/input.h"
 #include "plib/gnw/svga.h"
 
@@ -84,10 +87,14 @@ namespace {
 
 } // namespace
 
+bool scenes(const char* dir, int width, int height, bool game);
+
 bool devAutotestRun()
 {
     if (!contracts()) return false;
 
+    const char* theme = getenv("FALLOUT_AUTOTEST_THEME");
+    if (theme != nullptr) muiSettingsSetTheme(atoi(theme));
     const char* dir = getenv("FALLOUT_AUTOTEST_DIR");
     if (dir == nullptr) {
         const char* capture = getenv("FALLOUT_AUTOTEST_BMP");
@@ -102,7 +109,36 @@ bool devAutotestRun()
 
     if (!captureScene(dir, "00-dashboard", width, height)) return false;
 
+    return scenes(dir, width, height, false);
+}
+
+bool devAutotestGameRun()
+{
+    const char* dir = getenv("FALLOUT_AUTOTEST_DIR");
+    if (dir == nullptr) return true;
+    const int width = 1240;
+    const int height = 1080;
+    bottomScreenSetTest(width, height, 2.0f);
+    // A few real items for the inventory screens.
+    static const int kPids[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 40, 41 };
+    for (int pid : kPids) {
+        if (getenv("FALLOUT_AUTOTEST_NOITEMS")) break;
+        Object* item = nullptr;
+        if (obj_pid_new(&item, pid) == 0 && item != nullptr) {
+            obj_disconnect(item, nullptr);
+            if (item_add_force(obj_dude, item, pid == 40 ? 3 : 1) != 0) {
+                obj_erase_object(item, nullptr);
+            }
+        }
+    }
+    if (!captureScene(dir, "10-dashboard-ingame", width, height)) return false;
+    return scenes(dir, width, height, true);
+}
+
+bool scenes(const char* dir, int width, int height, bool game)
+{
     for (const MuiSceneEntry* entry = muiSceneEntries(); entry->name != nullptr; entry++) {
+        if (entry->needsGame != game) continue;
         MuiScreen* screen = entry->make();
         if (screen == nullptr) continue;
         muiPush(screen);
