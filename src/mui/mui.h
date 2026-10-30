@@ -343,6 +343,18 @@ int muiCharacterScreenRun();
 struct Object;
 int muiInventoryScreenRun(Object* owner);
 
+// Save/load slot picker (mui_loadsave.cc), shown while the classic save/load
+// loop runs. TakeChoice: slot 0..9 to act on, -2 cancel, -1 nothing yet.
+struct MuiSaveSlot {
+    bool empty = true;
+    bool broken = false;
+    std::string description;
+    std::string place;
+};
+void muiLoadSaveShow(bool saving, const std::vector<MuiSaveSlot>& slots, int cursor);
+void muiLoadSaveHide();
+int muiLoadSaveTakeChoice();
+
 // Called every frame of `muiRunModal` (autotest hook).
 void muiSetModalTick(void (*tick)());
 

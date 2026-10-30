@@ -42,6 +42,7 @@ target_sources(${EXECUTABLE_NAME} PRIVATE
     src/mui/mui_frame.cc
     src/mui/mui_character.cc
     src/mui/mui_inventory.cc
+    src/mui/mui_loadsave.cc
     src/mui/mui_options.cc
     src/mui/mui_settings.cc
     src/mui/mui_skin.cc)

@@ -6,6 +6,7 @@ static const MuiSceneEntry kScenes[] = {
     { "01-main-menu", muiMainMenuCreate, false },
     { "02-options", muiOptionsCreate, false },
     { "03-character", muiCharacterCreate, true },
+    { "05-loadsave", muiLoadSaveCreate, false },
     { "04-inventory", muiInventoryCreate, true },
     { nullptr, nullptr, false },
 };

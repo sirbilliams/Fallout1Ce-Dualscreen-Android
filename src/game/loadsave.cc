@@ -1,4 +1,5 @@
 #include "game/loadsave.h"
+#include "mui/mui.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -127,6 +128,9 @@ typedef enum LoadSaveFrm {
     LOAD_SAVE_FRM_COUNT,
 } LoadSaveFrm;
 
+static void mui_show_slots(bool saving);
+static void mui_hide_slots();
+static int mui_slot_key(int keyCode);
 static int QuickSnapShot();
 static int LSGameStart(int windowType);
 static int LSGameEnd(int windowType);
@@ -465,6 +469,7 @@ int SaveGame(int mode)
     DrawInfoBox(slot_cursor);
     win_draw(lsgwin);
     renderPresent();
+    mui_show_slots(true);
 
     dbleclkcntr = 24;
 
@@ -474,7 +479,7 @@ int SaveGame(int mode)
         sharedFpsLimiter.mark();
 
         unsigned int tick = get_time();
-        int keyCode = get_input();
+        int keyCode = mui_slot_key(get_input());
         bool selectionChanged = false;
         int scrollDirection = LOAD_SAVE_SCROLL_DIRECTION_NONE;
 
@@ -971,6 +976,7 @@ int LoadGame(int mode)
     ShowSlotList(2);
     DrawInfoBox(slot_cursor);
     win_draw(lsgwin);
+    mui_show_slots(false);
     dbleclkcntr = 24;
 
     int rc = -1;
@@ -979,7 +985,7 @@ int LoadGame(int mode)
         sharedFpsLimiter.mark();
 
         unsigned int time = get_time();
-        int keyCode = get_input();
+        int keyCode = mui_slot_key(get_input());
         bool selectionChanged = false;
         int scrollDirection = 0;
 
@@ -1479,6 +1485,7 @@ static int LSGameStart(int windowType)
 // 0x46F910
 static int LSGameEnd(int windowType)
 {
+    mui_hide_slots();
     win_delete(lsgwin);
     text_font(fontsave);
     message_exit(&lsgame_msgfl);
@@ -1870,6 +1877,43 @@ static int LoadHeader(int slot)
     ls_error_code = 0;
 
     return 0;
+}
+
+static void mui_show_slots(bool saving)
+{
+    std::vector<MuiSaveSlot> slots(10);
+    for (int index = 0; index < 10; index++) {
+        slots[index].empty = LSstatus[index] == SLOT_STATE_EMPTY;
+        slots[index].broken = LSstatus[index] == SLOT_STATE_ERROR || LSstatus[index] == SLOT_STATE_UNSUPPORTED_VERSION;
+        if (LSstatus[index] == SLOT_STATE_OCCUPIED) {
+            char buffer[96];
+            snprintf(buffer, sizeof(buffer), "%s", LSData[index].description);
+            slots[index].description = buffer[0] != '\0' ? buffer : LSData[index].characterName;
+            char* place = map_get_short_name(LSData[index].map);
+            snprintf(buffer, sizeof(buffer), "%s  %d/%d/%d", place != nullptr ? place : "", LSData[index].fileMonth, LSData[index].fileDay, LSData[index].fileYear);
+            slots[index].place = buffer;
+        }
+    }
+    muiLoadSaveShow(saving, slots, slot_cursor);
+}
+
+static void mui_hide_slots()
+{
+    muiLoadSaveHide();
+}
+
+// A choice of the touch picker as a key of the classic loop.
+static int mui_slot_key(int keyCode)
+{
+    int choice = muiLoadSaveTakeChoice();
+    if (choice == -2) {
+        return 501;
+    }
+    if (choice >= 0 && choice < 10) {
+        slot_cursor = choice;
+        return 500;
+    }
+    return keyCode;
 }
 
 // 0x4705C4

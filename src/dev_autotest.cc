@@ -3,12 +3,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <string.h>
+
 #include <string>
 #include <vector>
 
 #include <SDL.h>
 
 #include "bottom_screen.h"
+#include "game/inventry.h"
 #include "game/item.h"
 #include "game/object.h"
 #include "mobile_contracts.h"
@@ -62,6 +65,33 @@ namespace {
         bottomScreenSetTest(0, 0, 1.0f);
         mobilePublishSnapshot(MobileSnapshot {});
         return true;
+    }
+
+    // A tap on the bottom display ([x], [y] 0..1).
+    void tapBottom(float x, float y)
+    {
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = SDL_FINGERDOWN;
+        event.tfinger.touchId = kMobileBottomTouchId;
+        event.tfinger.fingerId = kMobileBottomTouchId + 1;
+        event.tfinger.x = x;
+        event.tfinger.y = y;
+        event.tfinger.pressure = 1.0f;
+        SDL_PushEvent(&event);
+        for (int i = 0; i < 4; i++) {
+            get_input();
+            renderPresent();
+            SDL_Delay(16);
+        }
+        event.type = SDL_FINGERUP;
+        event.tfinger.pressure = 0.0f;
+        SDL_PushEvent(&event);
+        for (int i = 0; i < 6; i++) {
+            get_input();
+            renderPresent();
+            SDL_Delay(16);
+        }
     }
 
     // Frames of the game's present path (top screens + bottom surface).
@@ -143,6 +173,15 @@ bool scenes(const char* dir, int width, int height, bool game)
         if (screen == nullptr) continue;
         muiPush(screen);
         bool ok = captureScene(dir, entry->name, width, height);
+        if (ok && game && strcmp(entry->name, "04-inventory") == 0) {
+            // Select the 10mm pistol (second row), then equip it.
+            frames(5);
+            tapBottom(0.3f, 0.37f);
+            ok = captureScene(dir, "04b-inventory-selected", width, height);
+            tapBottom(0.25f, 0.945f);
+            ok = ok && captureScene(dir, "04c-inventory-equipped", width, height);
+            SDL_Log("autotest: right hand item: %s", inven_right_hand(obj_dude) != nullptr ? item_name(inven_right_hand(obj_dude)) : (inven_left_hand(obj_dude) != nullptr ? item_name(inven_left_hand(obj_dude)) : "(none)"));
+        }
         muiRemove(screen);
         delete screen;
         if (!ok) return false;

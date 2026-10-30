@@ -42,6 +42,7 @@ MuiScreen* muiMainMenuCreate();
 MuiScreen* muiOptionsCreate();
 MuiScreen* muiCharacterCreate();
 MuiScreen* muiInventoryCreate();
+MuiScreen* muiLoadSaveCreate();
 
 // Terminated by { nullptr, nullptr }.
 const MuiSceneEntry* muiSceneEntries();
