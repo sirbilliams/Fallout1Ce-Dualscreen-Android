@@ -15,6 +15,7 @@
 #include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
 #include "plib/gnw/touch.h"
+#include "mobile_contracts.h"
 #include "plib/gnw/vcr.h"
 #include "plib/gnw/winmain.h"
 
@@ -1096,13 +1097,13 @@ void GNW95_process_message()
             handleMouseEvent(&e);
             break;
         case SDL_FINGERDOWN:
-            touch_handle_start(&(e.tfinger));
+            if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_start(&(e.tfinger));
             break;
         case SDL_FINGERMOTION:
-            touch_handle_move(&(e.tfinger));
+            if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_move(&(e.tfinger));
             break;
         case SDL_FINGERUP:
-            touch_handle_end(&(e.tfinger));
+            if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_end(&(e.tfinger));
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:

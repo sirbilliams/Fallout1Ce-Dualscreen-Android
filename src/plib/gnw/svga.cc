@@ -1,4 +1,5 @@
 #include "plib/gnw/svga.h"
+#include "mobile_contracts.h"
 
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
@@ -231,6 +232,7 @@ void renderPresent()
     SDL_RenderClear(gSdlRenderer);
     SDL_RenderCopy(gSdlRenderer, gSdlTexture, NULL, NULL);
     SDL_RenderPresent(gSdlRenderer);
+    mobileRenderBottom();
 }
 
 } // namespace fallout

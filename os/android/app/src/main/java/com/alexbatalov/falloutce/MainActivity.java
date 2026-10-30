@@ -8,6 +8,21 @@ import org.libsdl.app.SDLActivity;
 import java.io.File;
 
 public class MainActivity extends SDLActivity {
+    private BottomScreen bottomScreen;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (bottomScreen == null) bottomScreen = new BottomScreen(this);
+        bottomScreen.start();
+    }
+
+    @Override
+    protected void onPause() {
+        if (bottomScreen != null) bottomScreen.stop();
+        super.onPause();
+    }
+
     private boolean noExit = false;
 
     @Override

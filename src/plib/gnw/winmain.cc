@@ -58,6 +58,9 @@ int main(int argc, char* argv[])
     chdir(SDL_AndroidGetExternalStoragePath());
 #endif
 
+    SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+    SDL_SetHint("SDL_TOUCH_RENDER_SCALE", "1");
     SDL_ShowCursor(SDL_DISABLE);
 
     GNW95_isActive = true;
