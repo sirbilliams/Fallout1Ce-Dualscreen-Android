@@ -5,7 +5,6 @@
 #include <string.h>
 
 #include "game/actions.h"
-#include "mobile_contracts.h"
 #include "game/anim.h"
 #include "game/automap.h"
 #include "game/bmpdlog.h"
@@ -49,6 +48,7 @@
 #include "game/worldmap.h"
 #include "int/movie.h"
 #include "int/window.h"
+#include "mobile_contracts.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/gnw/debug.h"
