@@ -3,6 +3,10 @@
 #include "mui/mui_screens.h"
 #include "mui/mui_settings.h"
 
+#include "game/config.h"
+#include "game/gconfig.h"
+#include "game/options.h"
+#include "game/version.h"
 #include "plib/gnw/pad_actions.h"
 #include <SDL.h>
 #include <algorithm>
@@ -25,6 +29,10 @@ namespace {
         {
             if (controls) {
                 controls = false;
+                if (standalone) {
+                    muiRemove(this);
+                    standaloneClosed = true;
+                }
             } else {
                 choice = 504;
             }
@@ -32,7 +40,7 @@ namespace {
         void build(MuiContext& ui) override
         {
             if (controls) {
-                buildControls(ui);
+                buildSettings(ui);
                 return;
             }
             bool backTapped = false;
@@ -64,19 +72,12 @@ namespace {
                 if (ui.button(entry.id, { x, y, width, buttonHeight }, muiDecodeUtf8(entry.label), entry.code == 504 ? MuiButtonStyle::Primary : MuiButtonStyle::Normal)) {
                     if (entry.code == 505) {
                         controls = true;
+                        tab = 3;
                     } else {
                         choice = entry.code;
                     }
                 }
                 y += buttonHeight + gap;
-            }
-
-            // Theme: Pip-Boy 2000 or classic Fallout.
-            MuiRect label = { x, y, width, ui.dp(22.0f) };
-            muiDrawTextAligned(U"SCREEN THEME", label, ui.dp(15.0f), muiTheme().textDim, MuiAlign::Start, MuiAlign::Center);
-            int selected = settings.touch.bottom_theme == 2 ? 0 : 1;
-            if (ui.segmented("options.theme", { x, label.bottom() + ui.dp(4.0f), width, buttonHeight * 0.8f }, { U"PIP-BOY 2000", U"CLASSIC" }, &selected)) {
-                muiSettingsSetTheme(selected == 0 ? 2 : 0);
             }
         }
 
@@ -85,9 +86,9 @@ namespace {
         void buildControls(MuiContext& ui)
         {
             bool backTapped = false;
-            MuiRect content = muiScreenFrame(ui, U"CONTROLS", &backTapped);
+            MuiRect content = settingsContent;
             if (backTapped) {
-                controls = false;
+                back();
                 return;
             }
 
@@ -167,7 +168,7 @@ namespace {
 
             for (int b = 0; b <= kPadButtonCount; b++) {
                 std::string id = "controls.binding." + std::to_string(b);
-                std::string label = b == kPadButtonCount ? "RESET PAD TO DEFAULTS" : std::string(padButtonName(b)) + ": " + padActionName(padBinding(b));
+                std::string label = b == kPadButtonCount ? "RESET PAD TO DEFAULTS" : std::string(buttonLabels[b]) + "  —  " + actionLabels[padBinding(b)];
                 MuiRect row = { x, y, width, rowHeight };
                 bool visible = row.y >= content.y && row.bottom() <= content.bottom();
                 bool activated = false;
@@ -196,6 +197,148 @@ namespace {
             }
         }
 
+        MuiRect settingsContent;
+        bool standalone = false;
+        bool standaloneClosed = false;
+        int tab = 0;
+        static constexpr const char* buttonLabels[] = { "A", "B", "X", "Y", "Start", "Select", "LB", "RB", "L3", "R3", "D-pad up", "D-pad down", "D-pad left", "D-pad right", "L2", "R2" };
+        static constexpr const char* actionLabels[] = { "Unbound", "Left click", "Right click", "Tap click / hold right click", "Back", "Game menu", "Inventory", "Skilldex", "Character", "Pip-Boy", "Automap", "Sneak", "Swap hands", "Item mode", "Start combat", "End turn", "End combat", "Quick save", "Quick load" };
+        void buildSettings(MuiContext& ui)
+        {
+            bool close = false;
+            MuiRect area = muiScreenFrame(ui, U"SETTINGS", &close);
+            if (close) {
+                back();
+                return;
+            }
+            int previous = tab;
+            ui.segmented("settings.tabs", { area.x, area.y, area.w, ui.dp(40) }, { U"Game", U"Sound", U"Display", U"Controls", U"About" }, &tab);
+            if (previous != tab) {
+                padFocus = 0;
+                padMoved = true;
+            }
+            muiDrawTextAligned(tab < 2 ? U"Original game preferences • saved immediately" : U"Port settings • saved immediately", { area.x, area.y + ui.dp(42), area.w, ui.dp(24) }, ui.dp(11), muiTheme().textDim, MuiAlign::Start, MuiAlign::Center);
+            settingsContent = { area.x, area.y + ui.dp(70), area.w, area.h - ui.dp(70) };
+            if (tab == 3) {
+                buildControls(ui);
+                return;
+            }
+            struct Row {
+                const char* label;
+                int index;
+                double low, high, step;
+                const char* choices;
+            };
+            const Row game[] = {
+                { "Game difficulty", 0, 0, 2, 1, "Easy|Normal|Hard" }, { "Combat difficulty", 1, 0, 2, 1, "Wimpy|Normal|Rough" },
+                { "Violence", 2, 0, 3, 1, "None|Minimal|Normal|Maximum blood" }, { "Target highlight", 3, 0, 2, 1, "Off|On|Targeting only" },
+                { "Combat looks", 4, 0, 1, 1, "Off|On" }, { "Combat messages", 5, 0, 1, 1, "Verbose|Brief" },
+                { "Combat taunts", 6, 0, 1, 1, "Off|On" }, { "Language filter", 7, 0, 1, 1, "Off|On" },
+                { "Running", 8, 0, 1, 1, "Normal|Always" }, { "Subtitles", 9, 0, 1, 1, "Off|On" },
+                { "Item highlight", 10, 0, 1, 1, "Off|On" }, { "Combat speed", 11, 0, 50, 1, nullptr },
+                { "Text delay (seconds)", 12, 1, 6, .25, nullptr }, { "Player speedup", 19, 0, 1, 1, "Off|On" },
+                { "Brightness", 17, 1, 1.17999267578125, .01, nullptr }, { "Mouse sensitivity", 18, 1, 2.5, .1, nullptr }
+            };
+            const Row sound[] = { { "Master volume", 13, 0, 32767, 1024, nullptr }, { "Music volume", 14, 0, 32767, 1024, nullptr }, { "Sound effects volume", 15, 0, 32767, 1024, nullptr }, { "Speech volume", 16, 0, 32767, 1024, nullptr } };
+            const Row display[] = { { "Theme", 0, 0, 1, 1, "Pip-Boy 2000|Classic" }, { "HUD scale (%)", 1, 50, 300, 10, nullptr }, { "Bottom text size (%)", 2, 50, 300, 10, nullptr }, { "Reduce motion", 3, 0, 1, 1, "Off|On" }, { "Colour-blind safe", 4, 0, 1, 1, "Off|On" }, { "Dual screen", 5, 0, 1, 1, "Off|On" } };
+            if (tab == 4) {
+                char version[VERSION_MAX];
+                getverstr(version, sizeof(version));
+                const std::string lines[] = { "Fallout 1 Community Edition", std::string("Version: ") + version, "Build: " __DATE__ " " __TIME__, "Source: sirbilliams/Fallout1Ce-Dualscreen-Android", "Engine and component licences: LICENSE.md and third_party" };
+                for (int i = 0; i < 5; i++)
+                    muiDrawTextAligned(muiDecodeUtf8(lines[i].c_str()), { area.x, settingsContent.y + i * ui.dp(32), area.w, ui.dp(30) }, ui.dp(12), muiTheme().text, MuiAlign::Start, MuiAlign::Center);
+                if (ui.button("settings.source", { area.x, settingsContent.y + ui.dp(180), area.w, ui.dp(50) }, U"Open source repository") || padActivate) SDL_OpenURL("https://github.com/sirbilliams/Fallout1Ce-Dualscreen-Android");
+                padActivate = false;
+                return;
+            }
+            const Row* rows = tab == 0 ? game : tab == 1 ? sound
+                                                         : display;
+            int count = tab == 0 ? 16 : tab == 1 ? 4
+                                                 : 6;
+            float stride = ui.dp(68);
+            if (padMoved) {
+                ui.setScroll("settings.rows", std::max(0.f, padFocus * stride - settingsContent.h / 2));
+                padMoved = false;
+            }
+            float offset = ui.scroll("settings.rows", settingsContent, (count + 1) * stride);
+            muiPushClip(settingsContent);
+            for (int i = 0; i <= count; ++i) {
+                MuiRect rect = { area.x, settingsContent.y + i * stride - offset, area.w, ui.dp(58) };
+                bool visible = rect.y >= settingsContent.y && rect.bottom() <= settingsContent.bottom();
+                if (i == count) {
+                    if ((visible && ui.button("settings.reset", rect, U"Reset to defaults")) || (padActivate && padFocus == i)) {
+                        if (tab < 2)
+                            optionsResetValues(tab == 1);
+                        else {
+                            auto defaults = MuiTouchSettings();
+                            auto& t = settings.touch;
+                            t.bottom_theme = defaults.bottom_theme;
+                            t.hud_scale = defaults.hud_scale;
+                            t.bottom_text_size = defaults.bottom_text_size;
+                            t.reduce_motion = false;
+                            t.colour_blind_safe = false;
+                            t.dual_screen = true;
+                            muiSettingsSaveDisplay();
+                        }
+                    }
+                    continue;
+                }
+                const Row& row = rows[i];
+                auto& t = settings.touch;
+                double value = tab != 2 ? optionsGetValue(row.index) : i == 0 ? (t.bottom_theme == 2 ? 0 : 1)
+                    : i == 1                                                  ? t.hud_scale
+                    : i == 2                                                  ? t.bottom_text_size
+                    : i == 3                                                  ? t.reduce_motion
+                    : i == 4                                                  ? t.colour_blind_safe
+                                                                              : t.dual_screen;
+                double next = value;
+                std::string text = row.label;
+                if (row.choices) {
+                    std::string choices = row.choices;
+                    size_t begin = 0;
+                    for (int n = 0; n < int(value); n++)
+                        begin = choices.find('|', begin) + 1;
+                    text += "  —  " + choices.substr(begin, choices.find('|', begin) - begin);
+                } else {
+                    char number[40];
+                    snprintf(number, sizeof(number), "  %.2f", value);
+                    text += number;
+                }
+                if (visible && ui.button("settings.row." + std::to_string(i), { rect.x, rect.y, rect.w, row.choices ? rect.h : rect.h / 2 }, muiDecodeUtf8(text.c_str()), padFocus == i ? MuiButtonStyle::Primary : MuiButtonStyle::Normal)) next = value + row.step > row.high ? row.low : value + row.step;
+                if (!row.choices && visible) next = ui.slider("settings.slider." + std::to_string(i), { rect.x, rect.y + rect.h / 2, rect.w, rect.h / 2 }, next, row.low, row.high);
+                if (padActivate && padFocus == i) {
+                    next = value + row.step * padDelta;
+                    if (row.choices) {
+                        if (next > row.high) next = row.low;
+                        if (next < row.low) next = row.high;
+                    } else
+                        next = std::clamp(next, row.low, row.high);
+                }
+                if (next != value) {
+                    if (tab != 2)
+                        optionsSetValue(row.index, next);
+                    else {
+                        if (i == 0)
+                            t.bottom_theme = next == 0 ? 2 : 0;
+                        else if (i == 1)
+                            t.hud_scale = int(next);
+                        else if (i == 2)
+                            t.bottom_text_size = int(next);
+                        else if (i == 3)
+                            t.reduce_motion = next != 0;
+                        else if (i == 4)
+                            t.colour_blind_safe = next != 0;
+                        else
+                            t.dual_screen = next != 0;
+                        muiSettingsSaveDisplay();
+                    }
+                }
+            }
+            muiPopClip();
+            padActivate = false;
+            padDelta = 1;
+        }
+
         int padFocus = 0;
         int padDelta = 1;
         bool padMoved = false;
@@ -206,27 +349,57 @@ namespace {
     };
 
     OptionsScreen* gOptionsScreen = nullptr;
+    OptionsScreen* gSettingsScreen = nullptr;
 
 } // namespace
 
-bool muiOptionsPadActive() { return gOptionsScreen != nullptr; }
+bool muiOptionsPadActive() { return (gSettingsScreen && !gSettingsScreen->standaloneClosed) || gOptionsScreen; }
 
 bool muiOptionsPadButton(int button)
 {
-    if (gOptionsScreen == nullptr) return false;
-    auto& screen = *gOptionsScreen;
+    if (!muiOptionsPadActive()) return false;
+    auto& screen = *(gSettingsScreen && !gSettingsScreen->standaloneClosed ? gSettingsScreen : gOptionsScreen);
     if (button == SDL_CONTROLLER_BUTTON_B || button == SDL_CONTROLLER_BUTTON_START)
         screen.back();
     else if (!screen.controls) {
         if (button == SDL_CONTROLLER_BUTTON_A) screen.controls = true;
+        screen.tab = 3;
     } else if (button == SDL_CONTROLLER_BUTTON_DPAD_UP || button == SDL_CONTROLLER_BUTTON_DPAD_DOWN) {
-        screen.padFocus = (screen.padFocus + (button == SDL_CONTROLLER_BUTTON_DPAD_UP ? 21 : 1)) % 22;
+        int count = screen.tab == 0 ? 17 : screen.tab == 1 ? 5
+            : screen.tab == 2                              ? 7
+            : screen.tab == 3                              ? 22
+                                                           : 1;
+        screen.padFocus = (screen.padFocus + (button == SDL_CONTROLLER_BUTTON_DPAD_UP ? count - 1 : 1)) % count;
+        screen.padMoved = true;
+    } else if (button == SDL_CONTROLLER_BUTTON_LEFTSHOULDER || button == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) {
+        screen.tab = (screen.tab + (button == SDL_CONTROLLER_BUTTON_LEFTSHOULDER ? 4 : 1)) % 5;
+        screen.padFocus = 0;
         screen.padMoved = true;
     } else if (button == SDL_CONTROLLER_BUTTON_A || button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT || button == SDL_CONTROLLER_BUTTON_DPAD_LEFT) {
         screen.padActivate = true;
         screen.padDelta = button == SDL_CONTROLLER_BUTTON_DPAD_LEFT ? -1 : 1;
     }
     return true;
+}
+
+void muiSettingsShow(int tab)
+{
+    static OptionsScreen screen;
+    screen.standaloneClosed = false;
+    screen.controls = true;
+    screen.standalone = true;
+    screen.tab = tab;
+    screen.padFocus = 0;
+    screen.padMoved = true;
+    gSettingsScreen = &screen;
+    muiPush(&screen);
+}
+MuiScreen* muiSettingsCreate(int tab)
+{
+    auto* screen = new OptionsScreen();
+    screen->controls = true;
+    screen->tab = tab;
+    return screen;
 }
 
 void muiOptionsShow()

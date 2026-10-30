@@ -34,6 +34,17 @@ void muiSettingsRefresh()
     if (config_get_value(&game_config, "touch", "touch_hold_ms", &value) && (value == 0 || (value >= 300 && value <= 1500))) t.touch_hold_ms = value;
 }
 
+void muiSettingsSaveDisplay()
+{
+    auto& t = settings.touch;
+    config_set_value(&game_config, "touch", "hud_scale", t.hud_scale);
+    config_set_value(&game_config, "touch", "bottom_text_size", t.bottom_text_size);
+    config_set_value(&game_config, "touch", "reduce_motion", t.reduce_motion);
+    config_set_value(&game_config, "touch", "colour_blind_safe", t.colour_blind_safe);
+    config_set_value(&game_config, "touch", "bottom_screen", t.dual_screen);
+    muiSettingsSetTheme(t.bottom_theme);
+}
+
 void muiSettingsSetMouse(bool persist)
 {
     int bindings[kPadButtonCount];

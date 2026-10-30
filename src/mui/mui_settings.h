@@ -37,6 +37,7 @@ extern MuiSettings settings;
 
 // Re-reads fallout.cfg [touch] (cheap; called once per frame).
 void muiSettingsRefresh();
+void muiSettingsSaveDisplay();
 
 // Saves the mouse control settings (the same path as the theme).
 void muiSettingsSetMouse(bool persist = true);

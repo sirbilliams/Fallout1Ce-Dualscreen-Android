@@ -1,11 +1,19 @@
 # Controller controls
 
-OPTIONS > CONTROLS contains mouse settings and a scrolling row for every pad
-button. Tap a binding to cycle its action. With a controller, A on OPTIONS opens
-CONTROLS; D-pad up/down moves focus and scrolls it into view, A/right cycles
-forward, left cycles backward, and B/Start goes back. Mouse sliders change one
-step with A/left/right. RESET PAD TO DEFAULTS resets only pad bindings. Both
-Pip-Boy 2000 and Classic use the same controls and save immediately.
+SETTINGS is available from the main menu and bottom console. In-game OPTIONS >
+PREFERENCES opens Game; OPTIONS > CONTROLS opens the Controls tab.
+Game contains the original difficulty, combat, text, running and display
+preferences; Sound has four volume sliders. Display has Pip-Boy 2000 / Classic,
+HUD scale, bottom text size, reduce motion, colour-blind safe and dual screen.
+About shows version/build, a source link and a licences note.
+
+Tap tabs or use LB/RB to switch. D-pad up/down moves focus and scrolls it into
+view; A/right cycles forward and left cycles backward. B/Start goes back.
+Touch sliders drag; pad sliders change one step. Every change saves immediately
+through the existing game preferences or fallout.cfg setter. Reset on Game,
+Sound and Display restores that tab. RESET PAD TO DEFAULTS resets bindings only.
+Both themes share these controls. Remap labels use player-facing button/action
+names (for example “B — Right click” and “D-pad left — Back”).
 
 | Button | Default action | F1 input |
 |---|---|---|
@@ -65,6 +73,11 @@ disabled input, touch cycling, pad focus/scroll/cycling, reset, and
 captures CONTROLS in both themes (`68` through `71` BMPs). Run with `timeout 120`,
 `SDL_VIDEODRIVER=offscreen`, `SDL_AUDIODRIVER=dummy`, and a scratch working
 folder whose config references legally installed F1 data by absolute path.
-The standard vault-kit capture does not open CONTROLS, so its goldens are
-expected to remain unchanged. Mouse-test baselines for `68-controls-bottom`
-change with the scrolling layout; `69` through `71` are new captures.
+The standard captures now include `08-settings-{game,sound,display,controls,about}`
+(top/bottom BMPs). The settings autotest changes the theme, loads fallout.cfg
+into a fresh Config, checks the saved value, and restores the original theme.
+Run each theme with `FALLOUT_AUTOTEST_THEME=2` or `0`.
+
+Vault-kit goldens affected: `01-main-menu-bottom`, `02-options-bottom`,
+`10-dashboard-ingame-bottom` (the SETTINGS button); add the five `08-settings-*`
+top/bottom pairs for each theme. Mouse captures `67` through `71` also change.

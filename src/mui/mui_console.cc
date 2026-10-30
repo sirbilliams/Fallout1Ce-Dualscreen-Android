@@ -548,11 +548,12 @@ void muiDashConsole(MuiContext& ui)
 
     // MENU / SAVE / LOAD one share each, TOUCHPAD a share and a half.
     MuiRect system = { x, y, width, systemHeight };
-    float unit = (width - gap * 3.0f) / 4.5f;
+    float unit = (width - gap * 4.0f) / 5.5f;
     MuiRect menuCell = { x, y, unit, systemHeight };
     MuiRect saveCell = { menuCell.right() + gap, y, unit, systemHeight };
     MuiRect loadCell = { saveCell.right() + gap, y, unit, systemHeight };
-    MuiRect padCell = { loadCell.right() + gap, y, system.right() - loadCell.right() - gap, systemHeight };
+    MuiRect settingsCell = { loadCell.right() + gap, y, unit, systemHeight };
+    MuiRect padCell = { settingsCell.right() + gap, y, system.right() - settingsCell.right() - gap, systemHeight };
     if (consoleButton(ui, "console.menu", menuCell, "MENU", state.live)) {
         send(MobileCommandType::Menu);
     }
@@ -562,6 +563,7 @@ void muiDashConsole(MuiContext& ui)
     if (consoleButton(ui, "console.load", loadCell, "LOAD", state.live && !state.inCombat)) {
         send(MobileCommandType::Load);
     }
+    if (consoleButton(ui, "console.settings", settingsCell, "SETTINGS", state.live)) muiSettingsShow();
     if (consoleButton(ui, "console.pad", padCell, "TOUCHPAD", state.live)) {
         gPadOpen = true;
     }

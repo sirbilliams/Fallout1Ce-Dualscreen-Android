@@ -40,6 +40,7 @@ struct MuiSceneEntry {
 
 MuiScreen* muiMainMenuCreate();
 MuiScreen* muiOptionsCreate();
+MuiScreen* muiSettingsCreate(int tab);
 MuiScreen* muiCharacterCreate();
 MuiScreen* muiInventoryCreate();
 MuiScreen* muiLoadSaveCreate();

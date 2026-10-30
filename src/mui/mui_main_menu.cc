@@ -67,14 +67,18 @@ namespace {
             { "mainmenu.load", "LOAD GAME", MAIN_MENU_LOAD_GAME },
             { "mainmenu.intro", "INTRO", MAIN_MENU_INTRO },
             { "mainmenu.credits", "CREDITS", MAIN_MENU_CREDITS },
+            { "mainmenu.settings", "SETTINGS", -2 },
             { "mainmenu.exit", "EXIT", MAIN_MENU_EXIT },
         };
-        float height = (buttonHeight + gap) * 5.0f - gap;
+        float height = (buttonHeight + gap) * 6.0f - gap;
         float y = column.y + std::max((column.h - height) / 2.0f, 0.0f);
         for (const Button& button : buttons) {
             MuiRect rect = { column.x, y, column.w, buttonHeight };
             if (ui.button(button.id, rect, muiDecodeUtf8(button.label), button.choice == MAIN_MENU_NEW_GAME ? MuiButtonStyle::Primary : MuiButtonStyle::Normal)) {
-                choice = button.choice;
+                if (button.choice == -2)
+                    muiSettingsShow();
+                else
+                    choice = button.choice;
             }
             y += buttonHeight + gap;
         }

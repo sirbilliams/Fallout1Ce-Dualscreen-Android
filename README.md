@@ -7,6 +7,8 @@ A touch-first Android port of [fallout1-ce](https://github.com/alexbatalov/fallo
 
 This is a fan-made project. It is not affiliated with Bethesda or Interplay. You must bring your own copy of the game; no game data is included.
 
+- **Settings:** main menu SETTINGS, in-game OPTIONS → PREFERENCES, or dashboard SETTINGS; Game, Sound, Display, Controls and About tabs save immediately.
+
 ## Status
 
 Early, but playable.

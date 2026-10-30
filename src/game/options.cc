@@ -378,6 +378,54 @@ static PreferenceDescription btndat[PREF_COUNT] = {
     { 2, 0, 374, 451, 0, 0, { 207, 218, 0, 0 }, 0, GAME_CONFIG_MOUSE_SENSITIVITY_KEY, 1.0, 2.5, NULL },
 };
 
+// Adapter for the mobile settings screen. Keep runtime effects and disk writes
+// identical to the original preferences window.
+double optionsGetValue(int index)
+{
+    if (index == 12) return text_delay;
+    if (index == 17) return gamma_value;
+    if (index == 18) return mouse_sens;
+    if (index == 19) return player_speedup;
+    return index >= 0 && index < PREF_COUNT ? *btndat[index].valuePtr : 0;
+}
+void optionsSetValue(int index, double value)
+{
+    if (index == 12)
+        text_delay = value;
+    else if (index == 17)
+        gamma_value = value;
+    else if (index == 18)
+        mouse_sens = value;
+    else if (index == 19)
+        player_speedup = int(value);
+    else if (index >= 0 && index < PREF_COUNT)
+        *btndat[index].valuePtr = int(value);
+    JustUpdate();
+    SavePrefs(true);
+}
+void optionsResetValues(bool sound)
+{
+    double before[20];
+    for (int i = 0; i < 20; i++)
+        before[i] = optionsGetValue(i);
+    SetDefaults(false);
+    for (int i = 0; i < 20; i++) {
+        if ((i >= 13 && i <= 16) == sound) continue;
+        if (i == 12)
+            text_delay = before[i];
+        else if (i == 17)
+            gamma_value = before[i];
+        else if (i == 18)
+            mouse_sens = before[i];
+        else if (i == 19)
+            player_speedup = int(before[i]);
+        else
+            *btndat[i].valuePtr = int(before[i]);
+    }
+    JustUpdate();
+    SavePrefs(true);
+}
+
 // 0x481328
 int do_options()
 {
@@ -448,7 +496,10 @@ int do_options()
         }
 
         if (showPreferences) {
-            do_prefscreen();
+            if (muiIsEnabled())
+                muiSettingsShow(0);
+            else
+                do_prefscreen();
         } else {
             switch (keyCode) {
             case KEY_F12:

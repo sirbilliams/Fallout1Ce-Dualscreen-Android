@@ -337,6 +337,7 @@ int muiMainMenuTakeChoice();
 
 // Option menu (mui_options.cc), shown while options.cc's loop runs; the
 // choice is a key code of that loop (500..504), -1 for none yet.
+void muiSettingsShow(int tab = 0);
 bool muiOptionsPadActive();
 bool muiOptionsPadButton(int button);
 void muiOptionsShow();

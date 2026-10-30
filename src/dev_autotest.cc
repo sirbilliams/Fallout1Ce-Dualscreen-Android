@@ -341,6 +341,19 @@ bool devAutotestRun()
     // choice survives a restart.
     const char* persist = getenv("FALLOUT_AUTOTEST_PERSIST_THEME");
     if (persist != nullptr) muiSettingsSetTheme(atoi(persist), true);
+    muiSettingsRefresh();
+    int original = settings.touch.bottom_theme;
+    muiSettingsSetTheme(original == 2 ? 0 : 2);
+    Config disk;
+    if (!config_init(&disk)) return false;
+    int saved = -1;
+    bool persisted = config_load(&disk, "fallout.cfg", false)
+        && config_get_value(&disk, "touch", "bottom_theme", &saved)
+        && saved == (original == 2 ? 0 : 2);
+    config_exit(&disk);
+    muiSettingsSetTheme(original);
+    if (!persisted) return false;
+    SDL_Log("autotest-settings: theme disk persistence PASS");
     const char* dir = getenv("FALLOUT_AUTOTEST_DIR");
     if (dir == nullptr) {
         const char* capture = getenv("FALLOUT_AUTOTEST_BMP");
@@ -355,6 +368,27 @@ bool devAutotestRun()
 
     if (!captureScene(dir, "00-dashboard", width, height)) return false;
 
+    muiSettingsShow(2);
+    frames(4);
+    float x, y;
+    bool bottom = false;
+    if (!muiGetWidgetCenter("settings.row.0", &x, &y, &bottom) || !bottom) return false;
+    tapBottom(x, y);
+    if (settings.touch.bottom_theme == original) return false;
+    muiOptionsPadButton(SDL_CONTROLLER_BUTTON_A);
+    frames(3);
+    if (settings.touch.bottom_theme != original) return false;
+    // Shoulder tabs, focus scrolling, and Back all use the same pad router
+    // as the in-game controls test.
+    muiOptionsPadButton(SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+    muiOptionsPadButton(SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+    for (int i = 0; i < 15; i++)
+        muiOptionsPadButton(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+    frames(3);
+    if (!muiGetWidgetCenter("settings.row.15", &x, &y, &bottom)) return false;
+    muiOptionsPadButton(SDL_CONTROLLER_BUTTON_B);
+    if (muiOptionsPadActive()) return false;
+    SDL_Log("autotest-settings: touch theme, pad theme, tabs, scroll, back PASS");
     bool ok = scenes(dir, width, height, false);
     bottomScreenSetTest(0, 0, 1.0f);
     return ok;

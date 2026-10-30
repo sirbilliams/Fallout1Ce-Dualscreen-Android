@@ -5,6 +5,9 @@
 
 namespace fallout {
 
+double optionsGetValue(int index);
+void optionsSetValue(int index, double value);
+void optionsResetValues(bool sound);
 int do_options();
 int PauseWindow(bool is_world_map);
 int init_options_menu();
