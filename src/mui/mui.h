@@ -327,6 +327,12 @@ void muiMainMenuShow();
 void muiMainMenuHide();
 int muiMainMenuTakeChoice();
 
+// Option menu (mui_options.cc), shown while options.cc's loop runs; the
+// choice is a key code of that loop (500..504), -1 for none yet.
+void muiOptionsShow();
+void muiOptionsHide();
+int muiOptionsTakeChoice();
+
 // Called every frame of `muiRunModal` (autotest hook).
 void muiSetModalTick(void (*tick)());
 

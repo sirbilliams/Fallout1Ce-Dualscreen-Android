@@ -4,6 +4,7 @@ namespace fallout {
 
 static const MuiSceneEntry kScenes[] = {
     { "01-main-menu", muiMainMenuCreate },
+    { "02-options", muiOptionsCreate },
     { nullptr, nullptr },
 };
 

@@ -1,4 +1,5 @@
 #include "game/options.h"
+#include "mui/mui.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -385,12 +386,21 @@ int do_options()
         return -1;
     }
 
+    muiOptionsShow();
+
     int rc = -1;
     while (rc == -1) {
         sharedFpsLimiter.mark();
 
         int keyCode = get_input();
         bool showPreferences = false;
+
+        int touchChoice = muiOptionsTakeChoice();
+        if (touchChoice == 504) {
+            keyCode = KEY_ESCAPE;
+        } else if (touchChoice != -1) {
+            keyCode = touchChoice;
+        }
 
         if (keyCode == KEY_ESCAPE || keyCode == 504 || game_user_wants_to_quit != 0) {
             rc = 0;
@@ -458,6 +468,8 @@ int do_options()
         renderPresent();
         sharedFpsLimiter.throttle();
     }
+
+    muiOptionsHide();
 
     OptnEnd();
 
