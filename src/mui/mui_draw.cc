@@ -520,7 +520,7 @@ static void checkPalette()
 }
 
 // Converts 8-bit image to texture [entry] (created or reused).
-static bool uploadIndexed(ArtTexture& entry, const unsigned char* data, int width, int height)
+static bool uploadIndexed(ArtTexture& entry, const unsigned char* data, int width, int height, const unsigned char* palette = gPalette, unsigned int paletteVersion = gPaletteVersion)
 {
     std::vector<Uint32> pixels(static_cast<size_t>(width) * height);
     for (size_t index = 0; index < pixels.size(); index++) {
@@ -529,9 +529,9 @@ static bool uploadIndexed(ArtTexture& entry, const unsigned char* data, int widt
             pixels[index] = 0;
         } else {
             // Palette is 6 bits per channel.
-            Uint32 r = gPalette[color * 3] << 2;
-            Uint32 g = gPalette[color * 3 + 1] << 2;
-            Uint32 b = gPalette[color * 3 + 2] << 2;
+            Uint32 r = palette[color * 3] << 2;
+            Uint32 g = palette[color * 3 + 1] << 2;
+            Uint32 b = palette[color * 3 + 2] << 2;
             pixels[index] = 0xFF000000 | (r << 16) | (g << 8) | b;
         }
     }
@@ -553,7 +553,7 @@ static bool uploadIndexed(ArtTexture& entry, const unsigned char* data, int widt
     SDL_UpdateTexture(entry.texture, nullptr, pixels.data(), width * 4);
     entry.width = width;
     entry.height = height;
-    entry.paletteVersion = gPaletteVersion;
+    entry.paletteVersion = paletteVersion;
     return true;
 }
 
@@ -563,15 +563,21 @@ SDL_Texture* muiIndexedTexture(const std::string& key, const unsigned char* data
         return nullptr;
     }
 
-    checkPalette();
+    // The UI's own art always uses the game's standard palette (color.pal),
+    // never the current one (faded, a movie's), and waits for it to be loaded:
+    // art built earlier baked garbage colours in.
+    unsigned int tableVersion = colorTableVersion();
+    if (tableVersion == 0) {
+        return nullptr;
+    }
 
     IndexedTexture& entry = gIndexedTextures[key];
-    if (entry.base.texture != nullptr && entry.version == version && entry.base.paletteVersion == gPaletteVersion
+    if (entry.base.texture != nullptr && entry.version == version && entry.base.paletteVersion == tableVersion
         && entry.base.width == width && entry.base.height == height) {
         return entry.base.texture;
     }
 
-    if (!uploadIndexed(entry.base, data, width, height)) {
+    if (!uploadIndexed(entry.base, data, width, height, cmap, tableVersion)) {
         return nullptr;
     }
     entry.version = version;

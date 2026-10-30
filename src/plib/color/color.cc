@@ -433,6 +433,15 @@ static void setMixTable()
 }
 
 // 0x4C046C
+// CE: Counts successful loads of the standard palette (color.pal); 0 until
+// the first one. The mobile UI builds its art from `cmap` once it is non-zero.
+static unsigned int gColorTableVersion = 0;
+
+unsigned int colorTableVersion()
+{
+    return gColorTableVersion;
+}
+
 bool loadColorTable(const char* path)
 {
     if (colorNameMangler != NULL) {
@@ -473,6 +482,7 @@ bool loadColorTable(const char* path)
         cmap[index * 3 + 1] = g;
         cmap[index * 3 + 2] = b;
     }
+    gColorTableVersion++;
 
     // NOTE: Uninline.
     colorRead(handle, colorTable, 0x8000);

@@ -50,6 +50,7 @@ unsigned char* getSystemPalette();
 void setSystemPaletteEntries(unsigned char* a1, int a2, int a3);
 void getSystemPaletteEntry(int entry, unsigned char* r, unsigned char* g, unsigned char* b);
 bool loadColorTable(const char* path);
+unsigned int colorTableVersion();
 char* colorError();
 void setColorPalette(unsigned char* pal);
 void setColorPaletteEntry(int entry, unsigned char r, unsigned char g, unsigned char b);
