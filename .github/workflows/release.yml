@@ -56,54 +56,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  ios:
-    name: iOS
-
-    runs-on: macos-12
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Cache cmake build
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: ios-cmake-v1
-
-      - name: Configure
-        run: |
-          cmake \
-            -B build \
-            -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/ios.toolchain.cmake \
-            -D ENABLE_BITCODE=0 \
-            -D PLATFORM=OS64 \
-            -G Xcode \
-            -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY='' \
-            # EOL
-
-      - name: Build
-        run: |
-          cmake \
-            --build build \
-            --config RelWithDebInfo \
-            -j $(sysctl -n hw.physicalcpu) \
-            # EOL
-
-      - name: Pack
-        run: |
-          cd build
-          cpack -C RelWithDebInfo
-
-      - name: Upload
-        run: |
-          cd build
-          cp fallout-ce.ipa fallout-ce-ios.ipa
-          gh release upload ${{ github.event.release.tag_name }} fallout-ce-ios.ipa
-          rm fallout-ce-ios.ipa
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   linux:
     name: Linux (${{ matrix.arch }})
 
@@ -113,20 +65,11 @@ jobs:
       fail-fast: false
       matrix:
         arch:
-          - x86
           - x64
 
     steps:
       - name: Clone
         uses: actions/checkout@v4
-
-      - name: Dependencies (x86)
-        if: matrix.arch == 'x86'
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt update
-          sudo apt install --allow-downgrades libpcre2-8-0=10.34-7
-          sudo apt install g++-multilib libsdl2-dev:i386 zlib1g-dev:i386
 
       - name: Dependencies (x64)
         if: matrix.arch == 'x64'
@@ -139,15 +82,6 @@ jobs:
         with:
           path: build
           key: linux-${{ matrix.arch }}-cmake-v1
-
-      - name: Configure (x86)
-        if: matrix.arch == 'x86'
-        run: |
-          cmake \
-            -B build \
-            -D CMAKE_BUILD_TYPE=RelWithDebInfo \
-            -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain/Linux32.cmake \
-            # EOL
 
       - name: Configure (x64)
         if: matrix.arch == 'x64'
@@ -241,53 +175,5 @@ jobs:
           cp "Fallout Community Edition.dmg" fallout-ce-macos.dmg
           gh release upload ${{ github.event.release.tag_name }} fallout-ce-macos.dmg
           rm fallout-ce-macos.dmg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  windows:
-    name: Windows (${{ matrix.arch }})
-
-    runs-on: windows-2022
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x86
-            generator-platform: Win32
-          - arch: x64
-            generator-platform: x64
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Cache cmake build
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: windows-${{ matrix.arch }}-cmake-v1
-
-      - name: Configure
-        run: |
-          cmake \
-            -B build \
-            -G "Visual Studio 16 2019" \
-            -A ${{ matrix.generator-platform }} \
-            # EOL
-
-      - name: Build
-        run: |
-          cmake \
-            --build build \
-            --config RelWithDebInfo \
-            # EOL
-
-      - name: Upload
-        run: |
-          cd build/RelWithDebInfo
-          7z a fallout-ce-windows-${{ matrix.arch }}.zip fallout-ce.exe
-          gh release upload ${{ github.event.release.tag_name }} fallout-ce-windows-${{ matrix.arch }}.zip
-          rm fallout-ce-windows-${{ matrix.arch }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
