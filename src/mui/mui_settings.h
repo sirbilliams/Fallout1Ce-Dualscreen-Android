@@ -26,7 +26,7 @@ extern MuiSettings settings;
 void muiSettingsRefresh();
 
 // Saves the chosen theme (0 or 2) to fallout.cfg [touch] bottom_theme.
-void muiSettingsSetTheme(int theme);
+void muiSettingsSetTheme(int theme, bool persist = true);
 
 } // namespace fallout
 

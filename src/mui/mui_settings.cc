@@ -23,10 +23,14 @@ void muiSettingsRefresh()
     if (config_get_value(&game_config, "touch", "bottom_screen", &value)) t.dual_screen = value != 0;
 }
 
-void muiSettingsSetTheme(int theme)
+void muiSettingsSetTheme(int theme, bool persist)
 {
     config_set_value(&game_config, "touch", "bottom_theme", theme == 2 ? 2 : 0);
     settings.touch.bottom_theme = theme == 2 ? 2 : 0;
+    if (persist) {
+        // The game's own config write path: fallout.cfg [touch] bottom_theme.
+        gconfig_save();
+    }
 }
 
 } // namespace fallout

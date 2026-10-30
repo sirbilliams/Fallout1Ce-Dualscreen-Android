@@ -271,7 +271,11 @@ bool devAutotestRun()
     if (!contracts()) return false;
 
     const char* theme = getenv("FALLOUT_AUTOTEST_THEME");
-    if (theme != nullptr) muiSettingsSetTheme(atoi(theme));
+    if (theme != nullptr) muiSettingsSetTheme(atoi(theme), false);
+    // The options screen's own call (saves fallout.cfg): used to test that the
+    // choice survives a restart.
+    const char* persist = getenv("FALLOUT_AUTOTEST_PERSIST_THEME");
+    if (persist != nullptr) muiSettingsSetTheme(atoi(persist), true);
     const char* dir = getenv("FALLOUT_AUTOTEST_DIR");
     if (dir == nullptr) {
         const char* capture = getenv("FALLOUT_AUTOTEST_BMP");
