@@ -412,6 +412,10 @@ void muiPipboyUpdate(const MuiPipboyView& view);
 int muiPipboyTakeChoice();
 void muiPipboyHide();
 
+// Autotest: center of widget [id] (0..1 of its screen) on either surface;
+// [onBottom] says which. False when no widget has that id.
+bool muiGetWidgetCenter(const char* id, float* x, float* y, bool* onBottom);
+
 // Called every frame of `muiRunModal` (autotest hook).
 void muiSetModalTick(void (*tick)());
 

@@ -34,6 +34,7 @@ target_sources(${EXECUTABLE_NAME} PRIVATE
     src/dev_autotest.cc
     src/mui/mui_scenes_f1.cc
     src/mui/mui.cc
+    src/mui/mui_console.cc
     src/mui/mui_dash.cc
     src/mui/mui_draw.cc
     src/mui/mui_gameskin.cc

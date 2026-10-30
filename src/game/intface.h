@@ -53,6 +53,8 @@ int intface_toggle_item_state();
 void intface_use_item();
 int intface_is_item_right_hand();
 int intface_get_current_item(Object** itemPtr);
+// The active hand's button state (-1 without the bar): item action (InterfaceItemAction), weapon or not, disabled.
+int intface_get_current_state(int* action, bool* isWeapon, bool* isDisabled);
 int intface_update_ammo_lights();
 void intface_end_window_open(bool animated);
 void intface_end_window_close(bool animated);

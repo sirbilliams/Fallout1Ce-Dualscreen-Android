@@ -1169,7 +1169,14 @@ static void muiRenderSurface(SDL_Renderer* renderer, MuiSurface surface, int wid
         context.current = nullptr;
         context.isInteractive = false;
         if (top == nullptr) {
-            muiDashCompanion(context);
+            if (muiDashConsoleActive()) {
+                // The console takes the touches of the bottom screen.
+                context.isInteractive = true;
+                muiDashConsole(context);
+                context.isInteractive = false;
+            } else {
+                muiDashCompanion(context);
+            }
         }
         muiDashBottomOverlay(context, top);
     }

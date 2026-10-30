@@ -1,9 +1,14 @@
 #include "bottom_screen.h"
+#include "game/combat.h"
 #include "game/config.h"
 #include "game/gconfig.h"
+#include "game/intface.h"
+#include "game/object.h"
 #include "mobile_contracts.h"
 #include "mui/mui.h"
 #include "mui/mui_settings.h"
+#include "platform_compat.h"
+#include "plib/gnw/kb.h"
 #include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
 #include <deque>
@@ -41,6 +46,54 @@ bool mobileTakeCommand(MobileCommand* command)
     return true;
 }
 void mobileClearCommands() { commands.clear(); }
+static bool polled = false;
+static unsigned int polledAt = 0;
+// A polling loop runs every frame; this long without it and the game is busy
+// with something else.
+constexpr unsigned int kLiveMs = 250;
+bool mobileDispatchLive() { return polled && compat_ticks() - polledAt < kLiveMs; }
+int mobilePollKey(bool inCombat)
+{
+    polled = true;
+    polledAt = compat_ticks();
+    MobileCommand command;
+    if (!mobileTakeCommand(&command)) return -1;
+    if (command.generation != snapshot.generation || obj_dude == nullptr || !intface_is_enabled()) return -1;
+    bool playerTurn = inCombat && combat_whose_turn() == obj_dude;
+    switch (command.type) {
+    case MobileCommandType::OpenScreen:
+        switch (static_cast<MobileScreen>(command.id)) {
+        case MobileScreen::Inventory:
+            return KEY_LOWERCASE_I;
+        case MobileScreen::Character:
+            return KEY_LOWERCASE_C;
+        case MobileScreen::Pipboy:
+            return inCombat ? -1 : KEY_LOWERCASE_P; // the game refuses it in combat
+        case MobileScreen::Map:
+            return KEY_TAB;
+        default:
+            return -1;
+        }
+    case MobileCommandType::UseItem:
+        return command.id == -1 ? -20 : -1;
+    case MobileCommandType::SwapHand:
+        return KEY_LOWERCASE_B;
+    case MobileCommandType::CycleAttackMode:
+        return KEY_LOWERCASE_N;
+    case MobileCommandType::EndTurn:
+        return playerTurn ? KEY_SPACE : -1;
+    case MobileCommandType::EndCombat:
+        return playerTurn ? KEY_RETURN : -1;
+    case MobileCommandType::Menu:
+        return KEY_LOWERCASE_O;
+    case MobileCommandType::Save:
+        return KEY_F4;
+    case MobileCommandType::Load:
+        return KEY_F5;
+    default:
+        return -1;
+    }
+}
 void mobileRenderBottom()
 {
     MobileSettings settings = mobileSettings();

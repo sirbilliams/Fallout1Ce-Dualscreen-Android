@@ -1,4 +1,5 @@
 #include "game/combat.h"
+#include "mobile_contracts.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -2168,6 +2169,10 @@ static int combat_input()
         }
 
         input = get_input();
+        if (input == -1) {
+            // The bottom console's END TURN / END COMBAT (and the rest).
+            input = mobilePollKey(true);
+        }
 
         if (input == KEY_SPACE) {
             break;

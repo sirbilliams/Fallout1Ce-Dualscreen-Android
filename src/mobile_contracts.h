@@ -33,7 +33,16 @@ enum class MobileCommandType { OpenScreen,
     SelectEntry,
     UseItem,
     Walk,
-    EndTurn };
+    EndTurn,
+    // Lane 3a: the bottom console's buttons. OpenScreen takes a MobileScreen
+    // as id (Inventory, Character, Pipboy, Map = automap); UseItem with id -1
+    // is the active hand's item button.
+    EndCombat,
+    SwapHand,
+    CycleAttackMode,
+    Menu,
+    Save,
+    Load };
 struct MobileCommand {
     uint64_t generation = 0;
     MobileCommandType type = MobileCommandType::CloseScreen;
@@ -53,6 +62,15 @@ void mobilePublishSnapshot(MobileSnapshot snapshot);
 bool mobileQueueCommand(const MobileCommand& command);
 bool mobileTakeCommand(MobileCommand* command);
 void mobileClearCommands();
+// The game's input loops (main loop, combat input) call this when they have no
+// key: it turns the next queued command into the key code the classic
+// interface would have produced, after the same legality checks the keys have
+// (-1 for none). Every call also tells the console the game is listening.
+int mobilePollKey(bool inCombat);
+// The game's loops polled a moment ago: console buttons are live. Without it
+// (a classic loop runs, the enemy plays) they are dimmed and tapped commands
+// are dropped.
+bool mobileDispatchLive();
 void mobileRenderBottom();
 }
 #endif

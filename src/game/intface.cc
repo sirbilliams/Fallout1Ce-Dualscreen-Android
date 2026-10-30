@@ -1559,6 +1559,19 @@ int intface_get_current_item(Object** itemPtr)
     return 0;
 }
 
+int intface_get_current_state(int* action, bool* isWeapon, bool* isDisabled)
+{
+    if (interfaceWindow == -1) {
+        return -1;
+    }
+
+    const InterfaceItemState* state = &(itemButtonItems[itemCurrentItem]);
+    *action = state->action;
+    *isWeapon = state->isWeapon != 0;
+    *isDisabled = state->isDisabled != 0;
+    return 0;
+}
+
 // 0x454F50
 int intface_update_ammo_lights()
 {

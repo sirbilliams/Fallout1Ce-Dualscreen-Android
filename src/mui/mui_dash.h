@@ -17,6 +17,14 @@ void muiDashBackdrop(MuiContext& ui);
 // who, HP; the title outside a game.
 void muiDashCompanion(MuiContext& ui);
 
+// Bottom screen in a game with nothing else on it (mui_console.cc): the
+// interactive console - status card (tap: Pip-Boy), INV / CHA / PIP / MAP,
+// the active hand (use, swap, attack mode), AP and END TURN / END COMBAT in a
+// fight, MENU / SAVE / LOAD. Taps become commands of the mobile queue
+// (mobile_contracts.h) that the game's input loops carry out.
+bool muiDashConsoleActive();
+void muiDashConsole(MuiContext& ui);
+
 // Bottom screen, over its screens: a screen opening there fades in
 // ([top] - its topmost active screen), and the edges pulse red while dude's
 // HP is low.

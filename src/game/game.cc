@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "game/actions.h"
+#include "mobile_contracts.h"
 #include "game/anim.h"
 #include "game/automap.h"
 #include "game/bmpdlog.h"
@@ -474,6 +475,11 @@ void game_exit()
 // 0x43B748
 int game_handle_input(int eventCode, bool isInCombatMode)
 {
+    // No key: the bottom console's queued command, as the key it stands for.
+    if (eventCode == -1) {
+        eventCode = mobilePollKey(isInCombatMode);
+    }
+
     // NOTE: Uninline.
     if (game_state() == GAME_STATE_5) {
         dialogue_system_enter();

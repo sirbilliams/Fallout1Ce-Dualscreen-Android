@@ -12,11 +12,13 @@
 #include <SDL.h>
 
 #include "bottom_screen.h"
+#include "game/combat.h"
 #include "game/config.h"
 #include "game/editor.h"
 #include "game/game.h"
 #include "game/gconfig.h"
 #include "game/gdialog.h"
+#include "game/intface.h"
 #include "game/inventry.h"
 #include "game/item.h"
 #include "game/loadsave.h"
@@ -354,6 +356,220 @@ bool devAutotestRun()
     return ok;
 }
 
+namespace {
+
+    // Lane 3a: the bottom console, tapped like a finger would (FALLOUT_AUTOTEST_CONSOLE=1).
+    // The loop below is the game's own (get_input + game_handle_input), so the
+    // queued commands are carried out as in play; a screen a button opens blocks
+    // it, and a scheduled script captures it and closes it again.
+    std::string gConsoleDir;
+    int gConsoleWidth = 0;
+    int gConsoleHeight = 0;
+    std::string gConsoleName;
+    bool gConsoleDone = false;
+    int gConsoleStep = 0;
+    // Widget to tap on the second step of a script (combat), "" none.
+    std::string gConsoleThen;
+    std::string gConsoleThenName;
+
+    void consoleLoop(int count)
+    {
+        for (int i = 0; i < count && game_user_wants_to_quit == 0; i++) {
+            int key = get_input();
+            game_handle_input(key, false);
+            renderPresent();
+        }
+    }
+
+    void consoleShot(const std::string& name)
+    {
+        std::string base = gConsoleDir + "/" + name;
+        SDL_SaveBMP(gSdlTextureSurface, (base + "-top.bmp").c_str());
+        const unsigned char* bottom = bottomScreenTestFrame();
+        if (bottom != nullptr) saveRgba(bottom, gConsoleWidth, gConsoleHeight, base + "-bottom.bmp");
+    }
+
+    void consoleFinger(bool down, float x, float y)
+    {
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = down ? SDL_FINGERDOWN : SDL_FINGERUP;
+        event.tfinger.touchId = kMobileBottomTouchId;
+        event.tfinger.fingerId = kMobileBottomTouchId + 7;
+        event.tfinger.x = x;
+        event.tfinger.y = y;
+        event.tfinger.pressure = down ? 1.0f : 0.0f;
+        SDL_PushEvent(&event);
+    }
+
+    // Taps widget [id] without waiting (callable from a scheduled script).
+    bool consoleTapNow(const char* id)
+    {
+        float x, y;
+        bool onBottom = false;
+        if (!muiGetWidgetCenter(id, &x, &y, &onBottom) || !onBottom) {
+            SDL_Log("autotest: console widget %s not found", id);
+            return false;
+        }
+        consoleFinger(true, x, y);
+        return true;
+    }
+
+    // Finger up a few frames after the down.
+    Uint32 consoleUpTimer(Uint32, void*);
+    float gConsoleUpX = 0.0f;
+    float gConsoleUpY = 0.0f;
+    Uint32 consoleUpTimer(Uint32, void*)
+    {
+        consoleFinger(false, gConsoleUpX, gConsoleUpY);
+        return 0;
+    }
+
+    bool consoleTapScripted(const char* id)
+    {
+        float x, y;
+        bool onBottom = false;
+        if (!muiGetWidgetCenter(id, &x, &y, &onBottom) || !onBottom) {
+            SDL_Log("autotest: console widget %s not found", id);
+            return false;
+        }
+        consoleFinger(true, x, y);
+        gConsoleUpX = x;
+        gConsoleUpY = y;
+        schedule(64, consoleUpTimer);
+        return true;
+    }
+
+    // Runs while a screen the tapped button opened blocks the game loop:
+    // captures it, then closes it with Escape until the loop is back.
+    Uint32 consoleCloseTimer(Uint32, void*)
+    {
+        if (gConsoleDone) return 0;
+        if (gConsoleStep++ == 0) {
+            consoleShot(gConsoleName);
+            return 400;
+        }
+        if (gConsoleStep > 8) return 0;
+        pushKey(SDL_SCANCODE_ESCAPE);
+        return 400;
+    }
+
+    // Taps [id] from the main thread and lets the game loop run on; a blocking
+    // screen is captured as [name].
+    bool consoleTapShoot(const char* id, const char* name)
+    {
+        gConsoleName = name;
+        gConsoleStep = 0;
+        gConsoleDone = false;
+        schedule(1800, consoleCloseTimer);
+        if (!consoleTapScripted(id)) {
+            gConsoleDone = true;
+            return false;
+        }
+        consoleLoop(40);
+        // Back from the screen (or nothing opened).
+        gConsoleDone = true;
+        consoleLoop(40);
+        return true;
+    }
+
+    // Combat: a script of taps and captures while the combat loop blocks.
+    int gCombatStep = 0;
+    std::string gCombatButton;
+    std::string gCombatName;
+    Uint32 combatTimer(Uint32, void*)
+    {
+        switch (gCombatStep++) {
+        case 0:
+            consoleShot(gCombatName + "-1"); // the console in combat, player's turn
+            consoleTapScripted(gCombatButton.c_str());
+            return 600;
+        case 1:
+            consoleShot(gCombatName + "-2"); // after the button
+            return 400;
+        default:
+            if (isInCombat()) {
+                // Still in combat: finish it so the script goes on.
+                pushKey(SDL_SCANCODE_RETURN);
+                return 400;
+            }
+            return 0;
+        }
+    }
+
+    bool consoleScenes(const char* dir, int width, int height)
+    {
+        gConsoleDir = dir;
+        gConsoleWidth = width;
+        gConsoleHeight = height;
+
+        // A weapon in hand.
+        Object* weapon = nullptr;
+        Inventory* inventory = &obj_dude->data.inventory;
+        for (int i = 0; i < inventory->length; i++) {
+            Object* item = inventory->items[i].item;
+            if (item_get_type(item) == ITEM_TYPE_WEAPON) {
+                weapon = item;
+                break;
+            }
+        }
+        if (weapon != nullptr) {
+            inven_wield(obj_dude, weapon, HAND_RIGHT);
+            intface_update_items(false);
+            if (intface_is_item_right_hand() != HAND_RIGHT) intface_toggle_items(false);
+        }
+        SDL_Log("autotest: console weapon: %s", weapon != nullptr ? item_name(weapon) : "(none)");
+
+        consoleLoop(40);
+        consoleShot("30-console");
+
+        static const char* kButtons[][2] = {
+            { "console.inv", "31-console-inv" },
+            { "console.cha", "32-console-cha" },
+            { "console.pip", "33-console-pip" },
+            { "console.map", "34-console-map" },
+            { "console.menu", "35-console-menu" },
+            { "console.save", "36-console-save" },
+            { "console.load", "37-console-load" },
+        };
+        for (const auto& button : kButtons) {
+            consoleTapShoot(button[0], button[1]);
+            consoleLoop(10);
+        }
+        // The status card opens the Pip-Boy too.
+        consoleTapShoot("console.status", "38-console-status-pip");
+
+        // Hands and attack mode (the card shows the change).
+        consoleTapScripted("console.swap");
+        consoleLoop(30);
+        consoleShot("40-console-swapped");
+        consoleTapScripted("console.swap");
+        consoleLoop(30);
+        consoleTapScripted("console.mode");
+        consoleLoop(30);
+        consoleShot("41-console-mode");
+
+        // In combat: the weapon card starts one; END TURN, then END COMBAT.
+        static const char* kCombat[][2] = {
+            { "console.endturn", "50-console-endturn" },
+            { "console.endcombat", "51-console-endcombat" },
+        };
+        for (const auto& step : kCombat) {
+            gCombatStep = 0;
+            gCombatButton = step[0];
+            gCombatName = step[1];
+            schedule(2400, combatTimer);
+            consoleTapScripted("console.use");
+            consoleLoop(300);
+            SDL_Log("autotest: combat step %s, in combat now: %d", step[1], isInCombat() ? 1 : 0);
+            consoleLoop(20);
+            consoleShot(std::string(step[1]) + "-after");
+        }
+        return true;
+    }
+
+} // namespace
+
 bool devAutotestGameRun()
 {
     const char* dir = getenv("FALLOUT_AUTOTEST_DIR");
@@ -374,6 +590,11 @@ bool devAutotestGameRun()
         }
     }
     if (!captureScene(dir, "10-dashboard-ingame", width, height)) return false;
+    if (getenv("FALLOUT_AUTOTEST_CONSOLE") != nullptr) {
+        bool consoleOk = consoleScenes(dir, width, height);
+        bottomScreenSetTest(0, 0, 1.0f);
+        return consoleOk;
+    }
     if (!scenes(dir, width, height, true)) return false;
 
     // The real load screen: the classic loop runs with the touch picker over
