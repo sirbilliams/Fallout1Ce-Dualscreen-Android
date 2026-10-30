@@ -418,6 +418,26 @@ float muiFitTextSize(const std::u32string& text, float width, float size, float 
     return size;
 }
 
+std::u32string muiEllipsize(const std::u32string& text, float width, float size)
+{
+    if (muiTextWidth(text, size) <= width) {
+        return text;
+    }
+    std::u32string cut = text;
+    while (!cut.empty() && muiTextWidth(cut + U"..", size) > width) {
+        cut.pop_back();
+    }
+    while (!cut.empty() && cut.back() == U' ') {
+        cut.pop_back();
+    }
+    return cut + U"..";
+}
+
+void muiDrawTextEllipsis(const std::u32string& text, const MuiRect& rect, float size, MuiColor color, MuiAlign horizontal, MuiAlign vertical)
+{
+    muiDrawTextAligned(muiEllipsize(text, rect.w, size), rect, size, color, horizontal, vertical);
+}
+
 std::string muiEncodeGameText(const std::u32string& text)
 {
     std::string result;

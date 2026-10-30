@@ -2,6 +2,7 @@
 #include "mui/mui_gameskin.h"
 #include "mui/mui_screens.h"
 #include "mui/mui_settings.h"
+#include "mui/mui_skin.h"
 
 #include "game/config.h"
 #include "game/gconfig.h"
@@ -10,11 +11,22 @@
 #include "plib/gnw/pad_actions.h"
 #include <SDL.h>
 #include <algorithm>
+#include <cmath>
+#include <functional>
 #include <stdio.h>
+#include <string>
+#include <vector>
 
 namespace fallout {
 
 namespace {
+
+    constexpr const char* kPortVersion = "1.0.0"; // os/android/app/build.gradle versionName
+#ifdef PORT_GIT_HASH
+    constexpr const char* kPortHash = PORT_GIT_HASH;
+#else
+    constexpr const char* kPortHash = "";
+#endif
 
     // Option menu: the F1 options window's choices as key codes the loop in
     // options.cc understands (500 save, 501 load, 502 preferences, 503 exit,
@@ -81,117 +93,233 @@ namespace {
             }
         }
 
-        // The mouse controls page: how the cursor follows touch and the stick
-        // (fallout.cfg [touch], saved at once like the theme).
-        void buildControls(MuiContext& ui)
+        // One settings row for every tab: a plate with the name on the left
+        // and the value on the right; sliders carry their track below.
+        struct Item {
+            enum Kind { Choice,
+                Slider,
+                Action,
+                Info };
+            Kind kind = Choice;
+            std::string id;
+            std::string label;
+            std::string value;
+            double current = 0;
+            double low = 0;
+            double high = 1;
+            double step = 1;
+            bool danger = false;
+            std::function<void(double)> set;
+        };
+
+        static std::string choiceText(const char* choices, int index)
         {
-            bool backTapped = false;
-            MuiRect content = settingsContent;
-            if (backTapped) {
-                back();
-                return;
+            std::string all = choices;
+            size_t begin = 0;
+            for (int n = 0; n < index; n++) {
+                size_t bar = all.find('|', begin);
+                if (bar == std::string::npos) break;
+                begin = bar + 1;
+            }
+            return all.substr(begin, all.find('|', begin) - begin);
+        }
+
+        static std::string numberText(const char* format, double value)
+        {
+            char text[48];
+            snprintf(text, sizeof(text), format, value);
+            return text;
+        }
+
+        // Rows in a scrolling list with a position bar; pad focus keeps the
+        // focused row whole inside the list. Returns true while a slider is held.
+        bool drawItems(MuiContext& ui, std::vector<Item>& items, const MuiRect& content, const char* scrollId)
+        {
+            const MuiTheme& theme = muiTheme();
+            MuiInk ink = muiSkinInk();
+            float gap = ui.dp(6.0f);
+            float margin = ui.dp(4.0f);
+            float barRoom = ui.dp(14.0f);
+            float x = content.x;
+            float width = content.w - barRoom;
+
+            std::vector<float> top(items.size());
+            std::vector<float> height(items.size());
+            float total = margin;
+            for (size_t i = 0; i < items.size(); i++) {
+                height[i] = ui.dp(items[i].kind == Item::Slider ? 72.0f : 44.0f);
+                top[i] = total;
+                total += height[i] + gap;
+            }
+            total += margin;
+
+            int focusable = 0;
+            std::vector<int> focusIndex(items.size(), -1);
+            for (size_t i = 0; i < items.size(); i++) {
+                if (items[i].kind != Item::Info) focusIndex[i] = focusable++;
             }
 
-            MuiTouchSettings& t = settings.touch;
-            float gap = ui.dp(10.0f);
-            float width = std::min(content.w, ui.dp(520.0f));
-            float x = content.centerX() - width / 2.0f;
-            float rowHeight = ui.dp(60.0f);
-            float stride = rowHeight + gap;
             if (padMoved) {
-                ui.setScroll("controls", std::max(0.0f, padFocus * stride - content.h / 2));
+                for (size_t i = 0; i < items.size(); i++) {
+                    if (focusIndex[i] != padFocus) continue;
+                    float want = scrollOffset;
+                    if (top[i] - margin < want) want = top[i] - margin;
+                    if (top[i] + height[i] + margin > want + content.h) want = top[i] + height[i] + margin - content.h;
+                    ui.setScroll(scrollId, std::max(0.0f, want));
+                }
                 padMoved = false;
             }
-            float offset = ui.scroll("controls", content, 22 * stride + gap);
-            float y = content.y + gap - offset;
+            float offset = ui.scroll(scrollId, content, total);
+            scrollOffset = offset;
+
             muiPushClip(content);
-            bool changed = false;
             bool anyHeld = false;
-            int rowIndex = 0;
+            for (size_t i = 0; i < items.size(); i++) {
+                Item& item = items[i];
+                MuiRect row = { x, content.y + top[i] - offset, width, height[i] };
+                if (row.bottom() < content.y || row.y > content.bottom()) continue;
+                bool focused = focusIndex[i] == padFocus && focusIndex[i] >= 0;
+                bool whole = row.y >= content.y && row.bottom() <= content.bottom();
+                bool pressed = false;
+                bool tapped = false;
+                // Only rows that are whole take touches: no taps on cut-off rows.
+                if (item.kind != Item::Info && whole)
+                    tapped = ui.touchable(item.id, row, &pressed);
+                else if (item.kind == Item::Info)
+                    ui.mark(item.id, row);
 
-            auto toggleRow = [&](const char* id, const char* label, bool* value) {
-                MuiRect row = { x, y, width, rowHeight };
-                if (rowIndex == padFocus) muiFillRect(row, muiTheme().selected);
-                muiDrawTextAligned(muiDecodeUtf8(label), { row.x, row.y, row.w - ui.dp(96.0f), row.h }, ui.dp(14.0f), muiTheme().text, MuiAlign::Start, MuiAlign::Center);
-                if (padActivate && rowIndex == padFocus) {
-                    *value = !*value;
-                    changed = true;
+                muiSkinWell(ui, row);
+                if (pressed) muiFillRect(row, theme.buttonPressed.withAlpha(90));
+                if (focused) {
+                    muiFillRect(row, ink.selected);
+                    muiStrokeRoundRect(row.inset(ui.dp(1.0f)), ui.dp(3.0f), ui.dp(2.0f), ink.accent);
                 }
-                rowIndex++;
-                if (row.y >= content.y && row.bottom() <= content.bottom() && ui.toggle(id, { row.right() - ui.dp(88.0f), row.y, ui.dp(88.0f), row.h }, value)) {
-                    changed = true;
-                }
-                y += rowHeight + gap;
-            };
-            auto sliderRow = [&](const char* id, const char* label, int* value, int low, int high, int step, const char* offText) {
-                MuiRect row = { x, y, width, rowHeight };
-                if (rowIndex == padFocus) muiFillRect(row, muiTheme().selected);
-                char text[64];
-                if (offText != nullptr && *value <= low + 50) {
-                    snprintf(text, sizeof(text), "%s: %s", label, offText);
+
+                float size = ui.dp(13.0f);
+                MuiRect line = { row.x + ui.dp(14.0f), row.y, row.w - ui.dp(28.0f), item.kind == Item::Slider ? ui.dp(38.0f) : row.h };
+                if (item.kind == Item::Action) {
+                    muiDrawTextEllipsis(muiDecodeUtf8(item.label.c_str()), line, size, item.danger ? ink.warning : ink.text, MuiAlign::Center, MuiAlign::Center);
                 } else {
-                    snprintf(text, sizeof(text), "%s: %d", label, *value);
+                    std::u32string value = muiDecodeUtf8(item.value.c_str());
+                    float valueWidth = std::min(muiTextWidth(value, size), line.w * 0.6f);
+                    std::u32string label = muiDecodeUtf8(item.label.c_str());
+                    float labelRoom = std::max(line.w - valueWidth - ui.dp(14.0f), line.w * 0.3f);
+                    muiDrawTextEllipsis(label, { line.x, line.y, labelRoom, line.h }, size, ink.text, MuiAlign::Start, MuiAlign::Center);
+                    muiDrawTextEllipsis(value, { line.right() - valueWidth, line.y, valueWidth, line.h }, size, item.kind == Item::Info ? ink.dim : ink.accent, MuiAlign::End, MuiAlign::Center);
                 }
-                muiDrawTextAligned(muiDecodeUtf8(text), { row.x, row.y, row.w, row.h * 0.5f }, ui.dp(13.0f), muiTheme().text, MuiAlign::Start, MuiAlign::Center);
-                if (padActivate && rowIndex == padFocus) {
-                    *value = std::clamp(*value + step * padDelta, low, high);
-                    changed = true;
-                }
-                rowIndex++;
-                float current = static_cast<float>(*value);
-                bool held = false;
-                float next = current;
-                if (row.y >= content.y && row.bottom() <= content.bottom()) next = ui.slider(id, { row.x, row.y + row.h * 0.62f, row.w, row.h * 0.3f }, current, static_cast<float>(low), static_cast<float>(high), &held);
-                anyHeld = anyHeld || held;
-                int stepped = static_cast<int>(next / step + (next >= 0 ? 0.5f : -0.5f)) * step;
-                if (stepped < low) stepped = low;
-                if (stepped > high) stepped = high;
-                // Persist once the finger is lifted: the value is saved on change below.
-                if (stepped != *value) {
-                    *value = stepped;
-                    changed = true;
-                }
-                y += rowHeight + gap;
-            };
 
-            toggleRow("controls.direct", "TOUCH: CURSOR FOLLOWS FINGER", &t.direct_touch);
-            toggleRow("controls.stick", "RIGHT STICK MOVES CURSOR", &t.pad_cursor);
-            sliderRow("controls.speed", "CURSOR SPEED %", &t.cursor_speed, 50, 200, 10, nullptr);
-            sliderRow("controls.r3", "R3 LONG PRESS (MS)", &t.long_press_ms, 200, 1000, 50, nullptr);
-            // 300..1500 or off at 0: the low end of the slider is off.
-            int hold = t.touch_hold_ms == 0 ? 200 : t.touch_hold_ms;
-            int before = hold;
-            sliderRow("controls.hold", "TOUCH HOLD = RIGHT CLICK (MS)", &hold, 200, 1500, 50, "OFF");
-            if (hold != before) {
-                t.touch_hold_ms = hold < 300 ? 0 : hold;
+                bool activated = (tapped && item.kind != Item::Slider) || (padActivate && focused);
+                if (item.kind == Item::Slider) {
+                    float inset = ui.dp(36.0f);
+                    MuiRect track = { row.x + inset, row.y + ui.dp(52.0f), row.w - inset * 2.0f, ui.dp(6.0f) };
+                    bool held = false;
+                    double next = item.current;
+                    if (whole) next = ui.slider(item.id + ".track", track, static_cast<float>(item.current), static_cast<float>(item.low), static_cast<float>(item.high), &held);
+                    anyHeld = anyHeld || held;
+                    next = std::round((next - item.low) / item.step) * item.step + item.low;
+                    if (activated && padActivate && focused) next = item.current + item.step * padDelta;
+                    next = std::clamp(next, item.low, item.high);
+                    if (next != item.current && item.set) item.set(next);
+                } else if (activated && item.kind == Item::Choice) {
+                    double next = item.current + (padActivate && focused ? padDelta : 1) * item.step;
+                    if (next > item.high) next = item.low;
+                    if (next < item.low) next = item.high;
+                    if (item.set) item.set(next);
+                } else if (activated && item.kind == Item::Action) {
+                    if (item.set) item.set(1);
+                }
             }
+            muiPopClip();
 
-            for (int b = 0; b <= kPadButtonCount; b++) {
-                std::string id = "controls.binding." + std::to_string(b);
-                std::string label = b == kPadButtonCount ? "RESET PAD TO DEFAULTS" : std::string(buttonLabels[b]) + "  —  " + actionLabels[padBinding(b)];
-                MuiRect row = { x, y, width, rowHeight };
-                bool visible = row.y >= content.y && row.bottom() <= content.bottom();
-                bool activated = false;
-                if (visible) activated = ui.button(id, row, muiDecodeUtf8(label.c_str()), padFocus == b + 5 ? MuiButtonStyle::Primary : MuiButtonStyle::Normal);
-                if (visible && padFocus == b + 5) muiStrokeRoundRect(row.inset(ui.dp(2.0f)), ui.dp(4.0f), ui.dp(2.0f), muiTheme().accent);
-                if (activated || (padActivate && padFocus == b + 5)) {
-                    if (b == kPadButtonCount)
-                        padResetBindings();
-                    else
-                        padSetBinding(b, (padBinding(b) + padDelta + padActionCount()) % padActionCount());
-                }
-                y += stride;
+            // Position bar in the right margin, and a fade where more rows hide.
+            if (total > content.h) {
+                float barX = content.right() - ui.dp(8.0f);
+                MuiRect bar = { barX, content.y + ui.dp(4.0f), ui.dp(4.0f), content.h - ui.dp(8.0f) };
+                muiFillRect(bar, ink.dim.withAlpha(60));
+                float thumbH = std::max(bar.h * content.h / total, ui.dp(24.0f));
+                float thumbY = bar.y + (bar.h - thumbH) * std::clamp(offset / (total - content.h), 0.0f, 1.0f);
+                muiFillRect({ bar.x, thumbY, bar.w, thumbH }, ink.accent);
+                float fade = ui.dp(22.0f);
+                MuiColor dark = theme.background.withAlpha(235);
+                MuiColor clear = dark.withAlpha(0);
+                if (offset > 1.0f) muiFillGradient({ content.x, content.y, width, fade }, dark, dark, clear, clear);
+                if (offset < total - content.h - 1.0f) muiFillGradient({ content.x, content.bottom() - fade, width, fade }, clear, clear, dark, dark);
             }
             padActivate = false;
             padDelta = 1;
-            muiPopClip();
+            return anyHeld;
+        }
 
+        void buildControls(MuiContext& ui)
+        {
+            MuiTouchSettings& t = settings.touch;
+            std::vector<Item> items;
+            bool changed = false;
+            auto toggle = [&](const char* id, const char* label, bool* value) {
+                Item item;
+                item.id = id;
+                item.label = label;
+                item.value = *value ? "On" : "Off";
+                item.current = *value ? 1 : 0;
+                item.set = [&, value](double next) {
+                    *value = next != 0;
+                    changed = true;
+                };
+                items.push_back(item);
+            };
+            auto slider = [&](const char* id, const char* label, int* value, int low, int high, int step, const char* format, const char* offText) {
+                Item item;
+                item.kind = Item::Slider;
+                item.id = id;
+                item.label = label;
+                item.value = offText != nullptr && *value < low + 100 ? std::string(offText) : numberText(format, *value);
+                item.current = *value;
+                item.low = low;
+                item.high = high;
+                item.step = step;
+                item.set = [&, value](double next) {
+                    *value = static_cast<int>(next);
+                    changed = true;
+                };
+                items.push_back(item);
+            };
+            toggle("controls.direct", "Touch moves the cursor", &t.direct_touch);
+            toggle("controls.stick", "Right stick moves the cursor", &t.pad_cursor);
+            slider("controls.speed", "Cursor speed", &t.cursor_speed, 50, 200, 10, "%.0f%%", nullptr);
+            slider("controls.r3", "Right stick press: hold time", &t.long_press_ms, 200, 1000, 50, "%.0f ms", nullptr);
+            // 300..1500 or off at 0: the low end of the slider is off.
+            int hold = t.touch_hold_ms == 0 ? 200 : t.touch_hold_ms;
+            int before = hold;
+            slider("controls.hold", "Touch hold: right click after", &hold, 200, 1500, 50, "%.0f ms", "Off");
+            if (hold != before) {
+                t.touch_hold_ms = hold < 300 ? 0 : hold;
+                changed = true;
+            }
+            for (int b = 0; b < kPadButtonCount; b++) {
+                Item item;
+                item.id = "controls.binding." + std::to_string(b);
+                item.label = buttonLabels[b];
+                item.value = actionLabels[padBinding(b)];
+                item.current = padBinding(b);
+                item.high = padActionCount() - 1;
+                item.set = [b](double next) { padSetBinding(b, static_cast<int>(next)); };
+                items.push_back(item);
+            }
+            Item reset;
+            reset.kind = Item::Action;
+            reset.id = "controls.binding." + std::to_string(kPadButtonCount);
+            reset.label = "Reset controls to defaults";
+            reset.danger = true;
+            reset.set = [](double) { padResetBindings(); };
+            items.push_back(reset);
+
+            bool held = drawItems(ui, items, settingsContent, "controls");
             // Sliders save when the finger lets go, not on every step.
             if (changed) {
                 dirty = true;
                 muiSettingsSetMouse(false);
             }
-            if (dirty && !anyHeld) {
+            if (dirty && !held) {
                 muiSettingsSetMouse(true);
                 dirty = false;
             }
@@ -201,8 +329,8 @@ namespace {
         bool standalone = false;
         bool standaloneClosed = false;
         int tab = 0;
-        static constexpr const char* buttonLabels[] = { "A", "B", "X", "Y", "Start", "Select", "LB", "RB", "L3", "R3", "D-pad up", "D-pad down", "D-pad left", "D-pad right", "L2", "R2" };
-        static constexpr const char* actionLabels[] = { "Unbound", "Left click", "Right click", "Tap click / hold right click", "Back", "Game menu", "Inventory", "Skilldex", "Character", "Pip-Boy", "Automap", "Sneak", "Swap hands", "Item mode", "Start combat", "End turn", "End combat", "Quick save", "Quick load" };
+        static constexpr const char* buttonLabels[] = { "A", "B", "X", "Y", "Start", "Select", "Left bumper", "Right bumper", "Left stick press", "Right stick press", "D-pad up", "D-pad down", "D-pad left", "D-pad right", "Left trigger", "Right trigger" };
+        static constexpr const char* actionLabels[] = { "Not set", "Left click", "Right click", "Tap click / hold right click", "Back", "Game menu", "Inventory", "Skilldex", "Character", "Pip-Boy", "Automap", "Sneak", "Swap hands", "Item mode", "Start combat", "End turn", "End combat", "Quick save", "Quick load" };
         void buildSettings(MuiContext& ui)
         {
             bool close = false;
@@ -216,129 +344,177 @@ namespace {
             if (previous != tab) {
                 padFocus = 0;
                 padMoved = true;
+                scrollOffset = 0;
+                resetArmed = 0;
             }
-            muiDrawTextAligned(tab < 2 ? U"Original game preferences • saved immediately" : U"Port settings • saved immediately", { area.x, area.y + ui.dp(42), area.w, ui.dp(24) }, ui.dp(11), muiTheme().textDim, MuiAlign::Start, MuiAlign::Center);
-            settingsContent = { area.x, area.y + ui.dp(70), area.w, area.h - ui.dp(70) };
+            static const char32_t* const captions[] = { U"Original game preferences - saved immediately", U"Volume levels - saved immediately", U"Port display options - saved immediately", U"Touch, stick and button mapping - saved immediately", U"Version and licences" };
+            muiDrawTextAligned(captions[tab], { area.x + ui.dp(4), area.y + ui.dp(42), area.w, ui.dp(26) }, ui.dp(11), muiSkinInk().dim, MuiAlign::Start, MuiAlign::Center);
+            settingsContent = { area.x, area.y + ui.dp(72), area.w, area.h - ui.dp(72) };
             if (tab == 3) {
                 buildControls(ui);
                 return;
             }
-            struct Row {
-                const char* label;
-                int index;
-                double low, high, step;
-                const char* choices;
+
+            auto& t = settings.touch;
+            std::vector<Item> items;
+            // One of the original preferences (options.cc index), shown as a choice, a slider or a percentage.
+            auto choice = [&](const char* label, int index, const char* choices, int count) {
+                Item item;
+                item.id = "settings.row." + std::to_string(items.size());
+                item.label = label;
+                double value = optionsGetValue(index);
+                item.current = value;
+                item.high = count - 1;
+                item.value = choiceText(choices, static_cast<int>(value));
+                item.set = [index](double next) { optionsSetValue(index, next); };
+                items.push_back(item);
             };
-            const Row game[] = {
-                { "Game difficulty", 0, 0, 2, 1, "Easy|Normal|Hard" }, { "Combat difficulty", 1, 0, 2, 1, "Wimpy|Normal|Rough" },
-                { "Violence", 2, 0, 3, 1, "None|Minimal|Normal|Maximum blood" }, { "Target highlight", 3, 0, 2, 1, "Off|On|Targeting only" },
-                { "Combat looks", 4, 0, 1, 1, "Off|On" }, { "Combat messages", 5, 0, 1, 1, "Verbose|Brief" },
-                { "Combat taunts", 6, 0, 1, 1, "Off|On" }, { "Language filter", 7, 0, 1, 1, "Off|On" },
-                { "Running", 8, 0, 1, 1, "Normal|Always" }, { "Subtitles", 9, 0, 1, 1, "Off|On" },
-                { "Item highlight", 10, 0, 1, 1, "Off|On" }, { "Combat speed", 11, 0, 50, 1, nullptr },
-                { "Text delay (seconds)", 12, 1, 6, .25, nullptr }, { "Player speedup", 19, 0, 1, 1, "Off|On" },
-                { "Brightness", 17, 1, 1.17999267578125, .01, nullptr }, { "Mouse sensitivity", 18, 1, 2.5, .1, nullptr }
+            // [scale] maps the stored value to the number shown (a percentage).
+            auto slider = [&](const char* label, int index, double low, double high, double step, double shown0, double shownScale, const char* format) {
+                Item item;
+                item.kind = Item::Slider;
+                item.id = "settings.row." + std::to_string(items.size());
+                item.label = label;
+                double value = optionsGetValue(index);
+                item.current = value;
+                item.low = low;
+                item.high = high;
+                item.step = step;
+                item.value = numberText(format, (value - low) * shownScale + shown0);
+                item.set = [index](double next) { optionsSetValue(index, next); };
+                items.push_back(item);
             };
-            const Row sound[] = { { "Master volume", 13, 0, 32767, 1024, nullptr }, { "Music volume", 14, 0, 32767, 1024, nullptr }, { "Sound effects volume", 15, 0, 32767, 1024, nullptr }, { "Speech volume", 16, 0, 32767, 1024, nullptr } };
-            const Row display[] = { { "Theme", 0, 0, 1, 1, "Pip-Boy 2000|Classic" }, { "HUD scale (%)", 1, 50, 300, 10, nullptr }, { "Bottom text size (%)", 2, 50, 300, 10, nullptr }, { "Reduce motion", 3, 0, 1, 1, "Off|On" }, { "Colour-blind safe", 4, 0, 1, 1, "Off|On" }, { "Dual screen", 5, 0, 1, 1, "Off|On" } };
-            if (tab == 4) {
+            auto portChoice = [&](const char* label, const char* choices, double value, double high, std::function<void(double)> set) {
+                Item item;
+                item.id = "settings.row." + std::to_string(items.size());
+                item.label = label;
+                item.current = value;
+                item.high = high;
+                item.value = choiceText(choices, static_cast<int>(value));
+                item.set = [set](double next) {
+                    set(next);
+                    muiSettingsSaveDisplay();
+                };
+                items.push_back(item);
+            };
+            auto portSlider = [&](const char* label, int* value, int low, int high, int step) {
+                Item item;
+                item.kind = Item::Slider;
+                item.id = "settings.row." + std::to_string(items.size());
+                item.label = label;
+                item.current = *value;
+                item.low = low;
+                item.high = high;
+                item.step = step;
+                item.value = numberText("%.0f%%", *value);
+                item.set = [value](double next) {
+                    *value = static_cast<int>(next);
+                    muiSettingsSaveDisplay();
+                };
+                items.push_back(item);
+            };
+            auto resetRow = [&](std::function<void()> action) {
+                Item item;
+                item.kind = Item::Action;
+                item.id = "settings.reset";
+                bool armed = resetArmed != 0 && static_cast<int>(ui.now - resetArmed) < 3000;
+                item.label = armed ? "Tap again to confirm reset" : "Reset to defaults";
+                item.danger = true;
+                item.set = [this, &ui, armed, action](double) {
+                    if (armed) {
+                        action();
+                        resetArmed = 0;
+                    } else {
+                        resetArmed = ui.now;
+                    }
+                };
+                items.push_back(item);
+            };
+
+            if (tab == 0) {
+                choice("Game difficulty", 0, "Easy|Normal|Hard", 3);
+                choice("Combat difficulty", 1, "Wimpy|Normal|Rough", 3);
+                choice("Violence", 2, "None|Minimal|Normal|Maximum blood", 4);
+                choice("Target highlight", 3, "Off|On|Targeting only", 3);
+                choice("Combat looks", 4, "Off|On", 2);
+                choice("Combat messages", 5, "Verbose|Brief", 2);
+                choice("Combat taunts", 6, "Off|On", 2);
+                choice("Language filter", 7, "Off|On", 2);
+                choice("Running", 8, "Normal|Always", 2);
+                choice("Subtitles", 9, "Off|On", 2);
+                choice("Item highlight", 10, "Off|On", 2);
+                slider("Combat speed", 11, 0, 50, 1, 0, 1, "%.0f");
+                slider("Text delay", 12, 1, 6, .25, 1, 1, "%.1f s");
+                choice("Player speedup", 19, "Off|On", 2);
+                // Brightness 1.00 to 1.18 shown as 0 to 100 %.
+                slider("Brightness", 17, 1, 1.17999267578125, .01, 0, 100 / 0.17999267578125, "%.0f%%");
+                slider("Mouse sensitivity", 18, 1, 2.5, .1, 100, 100, "%.0f%%");
+                resetRow([] { optionsResetValues(false); });
+            } else if (tab == 1) {
+                // Stored 0..32767, shown as 0..100 %.
+                const char* names[] = { "Master volume", "Music volume", "Sound effects volume", "Speech volume" };
+                for (int i = 0; i < 4; i++) {
+                    Item item;
+                    item.kind = Item::Slider;
+                    item.id = "settings.row." + std::to_string(i);
+                    item.label = names[i];
+                    int index = 13 + i;
+                    double percent = std::round(optionsGetValue(index) * 100.0 / 32767.0);
+                    item.current = percent;
+                    item.high = 100;
+                    item.step = 5;
+                    item.value = numberText("%.0f%%", percent);
+                    item.set = [index](double next) { optionsSetValue(index, std::min(next * 32767.0 / 100.0, 32767.0)); };
+                    items.push_back(item);
+                }
+                resetRow([] { optionsResetValues(true); });
+            } else if (tab == 2) {
+                portChoice("Theme", "Pip-Boy 2000|Classic", t.bottom_theme == 2 ? 0 : 1, 1, [&t](double next) { t.bottom_theme = next == 0 ? 2 : 0; });
+                portSlider("HUD scale", &t.hud_scale, 50, 300, 10);
+                portSlider("Bottom text size", &t.bottom_text_size, 50, 300, 10);
+                portChoice("Reduce motion", "Off|On", t.reduce_motion, 1, [&t](double next) { t.reduce_motion = next != 0; });
+                portChoice("Colour-blind safe", "Off|On", t.colour_blind_safe, 1, [&t](double next) { t.colour_blind_safe = next != 0; });
+                portChoice("Dual screen", "Off|On", t.dual_screen, 1, [&t](double next) { t.dual_screen = next != 0; });
+                resetRow([&t] {
+                    auto defaults = MuiTouchSettings();
+                    t.bottom_theme = defaults.bottom_theme;
+                    t.hud_scale = defaults.hud_scale;
+                    t.bottom_text_size = defaults.bottom_text_size;
+                    t.reduce_motion = false;
+                    t.colour_blind_safe = false;
+                    t.dual_screen = true;
+                    muiSettingsSaveDisplay();
+                });
+            } else {
                 char version[VERSION_MAX];
                 getverstr(version, sizeof(version));
-                const std::string lines[] = { "Fallout 1 Community Edition", std::string("Version: ") + version, "Build: " __DATE__ " " __TIME__, "Source: sirbilliams/Fallout1Ce-Dualscreen-Android", "Engine and component licences: LICENSE.md and third_party" };
-                for (int i = 0; i < 5; i++)
-                    muiDrawTextAligned(muiDecodeUtf8(lines[i].c_str()), { area.x, settingsContent.y + i * ui.dp(32), area.w, ui.dp(30) }, ui.dp(12), muiTheme().text, MuiAlign::Start, MuiAlign::Center);
-                if (ui.button("settings.source", { area.x, settingsContent.y + ui.dp(180), area.w, ui.dp(50) }, U"Open source repository") || padActivate) SDL_OpenURL("https://github.com/sirbilliams/Fallout1Ce-Dualscreen-Android");
-                padActivate = false;
-                return;
+                auto info = [&](const char* label, const std::string& value) {
+                    Item item;
+                    item.kind = Item::Info;
+                    item.id = "settings.info." + std::to_string(items.size());
+                    item.label = label;
+                    item.value = value;
+                    items.push_back(item);
+                };
+                std::string port = muiPortVersion();
+                info("Port", "Fallout 1 CE Dual Screen");
+                info("Port version", port);
+                info("Game engine", version);
+                info("Licences", "LICENSE.md, third_party");
+                Item source;
+                source.kind = Item::Action;
+                source.id = "settings.source";
+                source.label = "Open source repository";
+                source.set = [](double) { SDL_OpenURL("https://github.com/sirbilliams/Fallout1Ce-Dualscreen-Android"); };
+                items.push_back(source);
             }
-            const Row* rows = tab == 0 ? game : tab == 1 ? sound
-                                                         : display;
-            int count = tab == 0 ? 16 : tab == 1 ? 4
-                                                 : 6;
-            float stride = ui.dp(68);
-            if (padMoved) {
-                ui.setScroll("settings.rows", std::max(0.f, padFocus * stride - settingsContent.h / 2));
-                padMoved = false;
-            }
-            float offset = ui.scroll("settings.rows", settingsContent, (count + 1) * stride);
-            muiPushClip(settingsContent);
-            for (int i = 0; i <= count; ++i) {
-                MuiRect rect = { area.x, settingsContent.y + i * stride - offset, area.w, ui.dp(58) };
-                bool visible = rect.y >= settingsContent.y && rect.bottom() <= settingsContent.bottom();
-                if (i == count) {
-                    if ((visible && ui.button("settings.reset", rect, U"Reset to defaults")) || (padActivate && padFocus == i)) {
-                        if (tab < 2)
-                            optionsResetValues(tab == 1);
-                        else {
-                            auto defaults = MuiTouchSettings();
-                            auto& t = settings.touch;
-                            t.bottom_theme = defaults.bottom_theme;
-                            t.hud_scale = defaults.hud_scale;
-                            t.bottom_text_size = defaults.bottom_text_size;
-                            t.reduce_motion = false;
-                            t.colour_blind_safe = false;
-                            t.dual_screen = true;
-                            muiSettingsSaveDisplay();
-                        }
-                    }
-                    continue;
-                }
-                const Row& row = rows[i];
-                auto& t = settings.touch;
-                double value = tab != 2 ? optionsGetValue(row.index) : i == 0 ? (t.bottom_theme == 2 ? 0 : 1)
-                    : i == 1                                                  ? t.hud_scale
-                    : i == 2                                                  ? t.bottom_text_size
-                    : i == 3                                                  ? t.reduce_motion
-                    : i == 4                                                  ? t.colour_blind_safe
-                                                                              : t.dual_screen;
-                double next = value;
-                std::string text = row.label;
-                if (row.choices) {
-                    std::string choices = row.choices;
-                    size_t begin = 0;
-                    for (int n = 0; n < int(value); n++)
-                        begin = choices.find('|', begin) + 1;
-                    text += "  —  " + choices.substr(begin, choices.find('|', begin) - begin);
-                } else {
-                    char number[40];
-                    snprintf(number, sizeof(number), row.step >= 1.0 ? "  %.0f" : "  %.2f", value);
-                    text += number;
-                }
-                if (visible && ui.button("settings.row." + std::to_string(i), { rect.x, rect.y, rect.w, row.choices ? rect.h : rect.h / 2 }, muiDecodeUtf8(text.c_str()), padFocus == i ? MuiButtonStyle::Primary : MuiButtonStyle::Normal)) next = value + row.step > row.high ? row.low : value + row.step;
-                if (!row.choices && visible) next = ui.slider("settings.slider." + std::to_string(i), { rect.x, rect.y + rect.h / 2, rect.w, rect.h / 2 }, next, row.low, row.high);
-                if (padActivate && padFocus == i) {
-                    next = value + row.step * padDelta;
-                    if (row.choices) {
-                        if (next > row.high) next = row.low;
-                        if (next < row.low) next = row.high;
-                    } else
-                        next = std::clamp(next, row.low, row.high);
-                }
-                if (next != value) {
-                    if (tab != 2)
-                        optionsSetValue(row.index, next);
-                    else {
-                        if (i == 0)
-                            t.bottom_theme = next == 0 ? 2 : 0;
-                        else if (i == 1)
-                            t.hud_scale = int(next);
-                        else if (i == 2)
-                            t.bottom_text_size = int(next);
-                        else if (i == 3)
-                            t.reduce_motion = next != 0;
-                        else if (i == 4)
-                            t.colour_blind_safe = next != 0;
-                        else
-                            t.dual_screen = next != 0;
-                        muiSettingsSaveDisplay();
-                    }
-                }
-            }
-            muiPopClip();
-            padActivate = false;
-            padDelta = 1;
+            drawItems(ui, items, settingsContent, tab == 0 ? "settings.rows.0" : tab == 1 ? "settings.rows.1"
+                    : tab == 2                                                            ? "settings.rows.2"
+                                                                                          : "settings.rows.4");
         }
 
+        float scrollOffset = 0;
+        unsigned int resetArmed = 0;
         int padFocus = 0;
         int padDelta = 1;
         bool padMoved = false;
@@ -352,6 +528,13 @@ namespace {
     OptionsScreen* gSettingsScreen = nullptr;
 
 } // namespace
+
+std::string muiPortVersion()
+{
+    std::string version = kPortVersion;
+    if (kPortHash[0] != '\0') version += std::string(" (") + kPortHash + ")";
+    return version;
+}
 
 bool muiOptionsPadActive() { return (gSettingsScreen && !gSettingsScreen->standaloneClosed) || gOptionsScreen; }
 

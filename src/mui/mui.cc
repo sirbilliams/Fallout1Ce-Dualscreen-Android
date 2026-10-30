@@ -860,6 +860,11 @@ bool MuiContext::segmented(const std::string& id, const MuiRect& rect, const std
         if (game) {
             muiSkinButton(*this, cell.inset(1.0f, 0.0f), on || pressed, false);
             muiGameButtonLabel(*this, cell, labels[index], on ? muiRgb(0xFFE890) : muiRgb(0xB8A040));
+            if (on) {
+                // The chosen tab's lamp: a glow and a bar at its foot.
+                muiFillRect(cell.inset(dp(3.0f)), kTheme.accent.withAlpha(34));
+                muiFillRect({ cell.x + dp(8.0f), cell.bottom() - dp(7.0f), cell.w - dp(16.0f), dp(3.0f) }, kTheme.accent);
+            }
             continue;
         }
         if (on) {

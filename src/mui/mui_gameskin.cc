@@ -1233,6 +1233,15 @@ void muiGameButtonLabel(MuiContext& ui, const MuiRect& rect, const std::u32strin
     muiGameDrawRole(label, rect.x + (rect.w - width) / 2.0f, rect.y + (rect.h - height) / 2.0f, MuiFontRole::Heading, scale, color);
 }
 
+MuiInk muiSkinInk()
+{
+    const MuiTheme& theme = muiTheme();
+    if (muiSkinPipboy()) {
+        return { theme.text, theme.textDim, theme.accent, theme.selected, theme.warning };
+    }
+    return { muiRgb(0xD8BE4A), muiRgb(0x9C8638), muiRgb(0xFFE890), muiRgb(0xD8BE4A, 46), muiRgb(0xE8643C) };
+}
+
 void muiGameLamp(MuiContext& ui, const MuiRect& rect, bool on, bool pressed)
 {
     (void)pressed;

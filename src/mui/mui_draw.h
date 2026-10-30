@@ -94,6 +94,10 @@ void muiDrawTextAligned(const std::u32string& text, const MuiRect& rect, float s
 std::vector<std::u32string> muiWrapText(const std::u32string& text, float width, float size);
 // Largest size from [size] down to [minSize] the text fits [width] with.
 float muiFitTextSize(const std::u32string& text, float width, float size, float minSize);
+// [text] cut at the end with ".." so it fits [width] at [size] (unchanged when it fits).
+std::u32string muiEllipsize(const std::u32string& text, float width, float size);
+// The same drawn in [rect] (one line, aligned).
+void muiDrawTextEllipsis(const std::u32string& text, const MuiRect& rect, float size, MuiColor color, MuiAlign horizontal, MuiAlign vertical);
 
 // Game art frame as texture in the current game palette (color 0 is
 // transparent), scaled with nearest filtering to keep pixel art crisp.

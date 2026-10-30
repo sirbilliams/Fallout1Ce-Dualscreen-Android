@@ -309,6 +309,14 @@ if(IOS)
     )
 endif()
 
+# Short git hash for Settings > About (empty when git or the checkout is missing).
+execute_process(COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE PORT_GIT_HASH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+set_property(SOURCE "src/mui/mui_options.cc" APPEND PROPERTY COMPILE_DEFINITIONS "PORT_GIT_HASH=\"${PORT_GIT_HASH}\"")
+
 if(WIN32)
     target_compile_definitions(${EXECUTABLE_NAME} PUBLIC
         _CRT_SECURE_NO_WARNINGS

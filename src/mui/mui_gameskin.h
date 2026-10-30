@@ -21,6 +21,17 @@ namespace fallout {
 // is 0).
 bool muiSkinFallout();
 bool muiSkinPipboy();
+
+// Text inks that fit the active skin (the theme's green tokens suit only the
+// Pip-Boy skin; the classic skin is lettered in the game's yellow).
+struct MuiInk {
+    MuiColor text;
+    MuiColor dim;
+    MuiColor accent;
+    MuiColor selected;
+    MuiColor warning;
+};
+MuiInk muiSkinInk();
 void muiPipboyOverlay(MuiContext& ui);
 
 // Fonts of the game by role.

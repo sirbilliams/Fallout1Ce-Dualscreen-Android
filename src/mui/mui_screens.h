@@ -27,6 +27,11 @@ struct MuiRow {
 int muiListView(MuiContext& ui, const std::string& id, const MuiRect& rect, const std::vector<MuiRow>& rows, float rowHeightDp = 38.0f);
 
 // A labelled readout line (label left, value right) drawn in [rect].
+// The player's name for headers; "Vault Dweller" while the character is unnamed ("None").
+std::u32string muiPlayerName();
+// Port version for the About page, the idle screens ("1.0.0 (abc1234)").
+std::string muiPortVersion();
+
 void muiReadout(MuiContext& ui, const MuiRect& rect, const std::u32string& label, const std::u32string& value);
 
 // Ported screens that can be created without opening an F1 modal (used by the
