@@ -301,7 +301,7 @@ namespace {
                     text += "  —  " + choices.substr(begin, choices.find('|', begin) - begin);
                 } else {
                     char number[40];
-                    snprintf(number, sizeof(number), "  %.2f", value);
+                    snprintf(number, sizeof(number), row.step >= 1.0 ? "  %.0f" : "  %.2f", value);
                     text += number;
                 }
                 if (visible && ui.button("settings.row." + std::to_string(i), { rect.x, rect.y, rect.w, row.choices ? rect.h : rect.h / 2 }, muiDecodeUtf8(text.c_str()), padFocus == i ? MuiButtonStyle::Primary : MuiButtonStyle::Normal)) next = value + row.step > row.high ? row.low : value + row.step;
