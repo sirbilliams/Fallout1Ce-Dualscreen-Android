@@ -1,4 +1,63 @@
-# Fallout Community Edition
+# Fallout 1 CE Mobile + Dual Screen (unofficial)
+
+![Fallout 1 CE on the AYN Thor: top screen](docs/screenshots/hero-top.jpg)
+![Fallout 1 CE on the AYN Thor: bottom screen](docs/screenshots/hero-bottom.jpg)
+
+A touch-first Android port of [fallout1-ce](https://github.com/alexbatalov/fallout1-ce) for the AYN Thor dual-screen handheld.
+
+This is a fan-made project. It is not affiliated with Bethesda or Interplay. You must bring your own copy of the game; no game data is included.
+
+## Status
+
+Early, but playable.
+
+- Touch UI for the main menu, options, character, inventory, save/load, dialogue, barter and Pip-Boy.
+- Pip-Boy 2000 theme by default, plus a Classic theme; your choice persists.
+- 960x540 widescreen at 2x on the Thor, with a wide interface bar.
+- Procedural CRT backdrop on the bottom screen.
+- The bottom screen is currently a display dashboard; an interactive console is in progress.
+
+See [docs/ui-style.md](docs/ui-style.md) for the UI style guide.
+
+## Screenshots
+
+Top screen above, bottom screen below.
+
+**Pip-Boy 2000 theme (default)**
+
+![Inventory, top](docs/screenshots/inventory-top.jpg)
+![Inventory, bottom](docs/screenshots/inventory-bottom.jpg)
+
+![Barter, top](docs/screenshots/barter-top.jpg)
+![Barter, bottom](docs/screenshots/barter-bottom.jpg)
+
+![Dialogue, bottom](docs/screenshots/dialogue-bottom.jpg)
+![Pip-Boy, bottom](docs/screenshots/pipboy-bottom.jpg)
+
+**Classic theme**
+
+![Barter, bottom](docs/screenshots/barter-classic-bottom.jpg)
+![Dashboard, bottom](docs/screenshots/dashboard-classic.jpg)
+
+## Install on the AYN Thor
+
+1. Download `Fallout1-Dualscreen.apk` from [Releases](../../releases/latest).
+2. Install the APK.
+3. Import your own game folder or zip file. The Windows High Resolution Patch files are ignored automatically.
+
+## Building
+
+- Desktop: CMake (see the upstream instructions below).
+- Android: built by CI (GitHub Actions); download the APK from Releases.
+
+## Credits
+
+- [fallout1-ce](https://github.com/alexbatalov/fallout1-ce) by alexbatalov, the engine this port is built on.
+- This port: touch UI, themes, widescreen and dual-screen support.
+
+---
+
+# Upstream: Fallout Community Edition
 
 Fallout Community Edition is a fully working re-implementation of Fallout, with the same original gameplay, engine bugfixes, and some quality of life improvements, that works (mostly) hassle-free on multiple platforms.
 
