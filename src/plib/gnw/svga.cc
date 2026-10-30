@@ -84,7 +84,17 @@ void GNW95_ShowRect(unsigned char* src, unsigned int srcPitch, unsigned int a3, 
 
 bool svga_init(VideoOptions* video_options)
 {
+#ifdef __ANDROID__
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
+    // Without these Android may pick an RGB565 surface (with GL_DITHER on),
+    // which bands and dithers the whole top screen.
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
+#else
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+#endif
 
     if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) {
         return false;
@@ -184,6 +194,18 @@ static bool createRenderer(int width, int height)
     if (SDL_RenderSetLogicalSize(gSdlRenderer, width, height) != 0) {
         return false;
     }
+
+#ifdef __ANDROID__
+    // GL_DITHER (0x0BD0) is on by default in GLES; the 8-bit palette art
+    // looks wrong with it. The renderer's context is current here.
+    {
+        typedef void (*GlDisableFn)(unsigned int);
+        GlDisableFn glDisableFn = reinterpret_cast<GlDisableFn>(SDL_GL_GetProcAddress("glDisable"));
+        if (glDisableFn != NULL) {
+            glDisableFn(0x0BD0);
+        }
+    }
+#endif
 
 #ifdef __ANDROID__
     // Largest whole-number scale that fits (960x540 -> 2x on 1920x1080).
