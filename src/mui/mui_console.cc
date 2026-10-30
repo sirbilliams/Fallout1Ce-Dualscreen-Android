@@ -3,6 +3,7 @@
 #include "mui/mui_settings.h"
 #include "mui/mui_skin.h"
 
+#include <math.h>
 #include <stdio.h>
 
 #include <algorithm>
@@ -20,6 +21,9 @@
 #include "game/stat.h"
 #include "game/stat_defs.h"
 #include "mobile_contracts.h"
+#include "mui/mui_screens.h"
+#include "plib/gnw/mouse_ctl.h"
+#include "plib/gnw/svga.h"
 
 namespace fallout {
 
@@ -337,14 +341,162 @@ namespace {
 
 } // namespace
 
+// Touchpad page (the TOUCHPAD button): the bottom screen as a trackpad for the
+// game's cursor. The feel is the SpongeBob port's: a drag moves the cursor
+// relatively with acceleration (slow = precise, fast = across the screen), a
+// quick tap is a left click, press and hold without moving then drag = the
+// left button held (carry an item), a two-finger tap is a right click.
+namespace {
+
+    // The pad is 1160 "layout px" wide in the numbers of the reference port.
+    constexpr float kPadLayoutWidth = 1160.0f;
+    constexpr float kPadSlop = 22.0f;
+    constexpr unsigned int kTapMs = 320;
+    constexpr unsigned int kHoldMs = 380;
+    // A two-finger tap may take a little longer to land both fingers.
+    constexpr unsigned int kTwoTapMs = 450;
+
+    bool gPadOpen = false;
+
+    struct PadTouch {
+        bool on = false;
+        bool slopLeft = false;
+        bool held = false;
+        bool two = false;
+        float startX = 0.0f;
+        float startY = 0.0f;
+        float lastX = 0.0f;
+        float lastY = 0.0f;
+        unsigned int startT = 0;
+        unsigned int lastT = 0;
+        float speed = 0.0f;
+    };
+    PadTouch gPad;
+
+    void padReset()
+    {
+        if (gPad.held) {
+            mouseCtlPadHold(false);
+        }
+        gPad = PadTouch();
+    }
+
+    void padPage(MuiContext& ui)
+    {
+        const MuiTheme& theme = muiTheme();
+        bool back = false;
+        MuiRect content = muiScreenFrame(ui, U"TOUCHPAD", &back);
+        if (back) {
+            padReset();
+            gPadOpen = false;
+            return;
+        }
+
+        float hintHeight = ui.dp(54.0f);
+        MuiRect area = { content.x, content.y, content.w, content.h - hintHeight - ui.dp(8.0f) };
+        MuiRect hint = { content.x, area.bottom() + ui.dp(8.0f), content.w, hintHeight };
+
+        ui.panel(area);
+        bool pressed = false;
+        ui.touchable("pad.area", area, &pressed);
+
+        float unit = area.w / kPadLayoutWidth;
+        float scale = static_cast<float>(screenGetWidth()) / 640.0f * static_cast<float>(settings.touch.cursor_speed) / 100.0f;
+        unsigned int now = ui.now;
+
+        if (ui.pointerPressed() && area.contains(ui.pointerStartX(), ui.pointerStartY())) {
+            padReset();
+            gPad.on = true;
+            gPad.startX = gPad.lastX = ui.pointerStartX();
+            gPad.startY = gPad.lastY = ui.pointerStartY();
+            gPad.startT = gPad.lastT = now;
+        }
+
+        if (gPad.on) {
+            float x = ui.pointerX();
+            float y = ui.pointerY();
+            if (ui.secondFingerDown()) {
+                gPad.two = true;
+            }
+            float away = hypotf(x - gPad.startX, y - gPad.startY) / unit;
+
+            if (!gPad.held && !gPad.slopLeft && !gPad.two && ui.pointerDown() && now - gPad.startT >= kHoldMs && away < kPadSlop) {
+                gPad.held = true;
+                mouseCtlPadHold(true);
+            }
+
+            if (!gPad.slopLeft && away >= kPadSlop) {
+                // Not a tap / a hold any more (a held button stays down); the
+                // cursor starts from here, no jump by the slop.
+                gPad.slopLeft = true;
+                gPad.lastX = x;
+                gPad.lastY = y;
+                gPad.lastT = now;
+            } else if ((gPad.slopLeft || gPad.held) && !gPad.two) {
+                float dx = (x - gPad.lastX) / unit;
+                float dy = (y - gPad.lastY) / unit;
+                unsigned int dt = std::max(1u, now - gPad.lastT);
+                gPad.lastX = x;
+                gPad.lastY = y;
+                gPad.lastT = now;
+                if (dx != 0.0f || dy != 0.0f) {
+                    float speed = hypotf(dx, dy) / static_cast<float>(dt);
+                    gPad.speed = gPad.speed * 0.6f + speed * 0.4f;
+                    float gain = 0.45f + std::min(1.8f, gPad.speed * 0.9f);
+                    mouseCtlPadMove(dx * gain * scale, dy * gain * scale);
+                }
+            }
+
+            if (ui.pointerReleased()) {
+                unsigned int duration = now - gPad.startT;
+                if (gPad.held) {
+                    mouseCtlPadHold(false);
+                } else if (gPad.two) {
+                    if (!gPad.slopLeft && duration <= kTwoTapMs) {
+                        mouseCtlPadClick(2);
+                    }
+                } else if (!gPad.slopLeft && duration <= kTapMs) {
+                    mouseCtlPadClick(1);
+                }
+                gPad = PadTouch();
+            }
+        }
+
+        // Nothing but the trackpad's own marks: a faint cross, the state.
+        MuiRect middle = { area.x, area.centerY() - ui.dp(36.0f), area.w, ui.dp(40.0f) };
+        muiDrawTextAligned(U"TOUCHPAD", middle, ui.dp(20.0f), theme.textDim, MuiAlign::Center, MuiAlign::Center);
+        if (gPad.held) {
+            MuiRect holding = { area.x, area.bottom() - ui.dp(48.0f), area.w, ui.dp(36.0f) };
+            muiDrawTextAligned(U"HOLDING", holding, ui.dp(16.0f), theme.accent, MuiAlign::Center, MuiAlign::Center);
+        }
+
+        std::u32string line1 = u("drag = move cursor \xC2\xB7 tap = click \xC2\xB7 two-finger tap = right click");
+        std::u32string line2 = u("hold then drag = carry");
+        MuiRect first = { hint.x, hint.y, hint.w, hint.h / 2.0f };
+        MuiRect second = { hint.x, hint.y + hint.h / 2.0f, hint.w, hint.h / 2.0f };
+        float size = std::min(muiFitTextSize(line1, hint.w, ui.dp(13.0f), ui.dp(10.0f)), ui.dp(13.0f));
+        muiDrawTextAligned(line1, first, size, theme.text, MuiAlign::Center, MuiAlign::Center);
+        muiDrawTextAligned(line2, second, size, theme.text, MuiAlign::Center, MuiAlign::Center);
+    }
+
+} // namespace
+
 bool muiDashConsoleActive()
 {
-    return obj_dude != nullptr && muiIsPlaying() && !muiIsTalking();
+    bool active = obj_dude != nullptr && muiIsPlaying() && !muiIsTalking();
+    if (!active) {
+        padReset();
+    }
+    return active;
 }
 
 void muiDashConsole(MuiContext& ui)
 {
     State state = publishState();
+    if (gPadOpen) {
+        padPage(ui);
+        return;
+    }
     MuiRect screen = ui.screenRect();
 
     // Heights in dp; a screen shorter than the layout squeezes the gaps and
@@ -394,15 +546,24 @@ void muiDashConsole(MuiContext& ui)
     combatRow(ui, { x, y, width, combatHeight }, state);
     y += combatHeight + gap;
 
+    // MENU / SAVE / LOAD one share each, TOUCHPAD a share and a half.
     MuiRect system = { x, y, width, systemHeight };
-    if (consoleButton(ui, "console.menu", cell(system, 0, 3, gap), "MENU", state.live)) {
+    float unit = (width - gap * 3.0f) / 4.5f;
+    MuiRect menuCell = { x, y, unit, systemHeight };
+    MuiRect saveCell = { menuCell.right() + gap, y, unit, systemHeight };
+    MuiRect loadCell = { saveCell.right() + gap, y, unit, systemHeight };
+    MuiRect padCell = { loadCell.right() + gap, y, system.right() - loadCell.right() - gap, systemHeight };
+    if (consoleButton(ui, "console.menu", menuCell, "MENU", state.live)) {
         send(MobileCommandType::Menu);
     }
-    if (consoleButton(ui, "console.save", cell(system, 1, 3, gap), "SAVE", state.live && !state.inCombat)) {
+    if (consoleButton(ui, "console.save", saveCell, "SAVE", state.live && !state.inCombat)) {
         send(MobileCommandType::Save);
     }
-    if (consoleButton(ui, "console.load", cell(system, 2, 3, gap), "LOAD", state.live && !state.inCombat)) {
+    if (consoleButton(ui, "console.load", loadCell, "LOAD", state.live && !state.inCombat)) {
         send(MobileCommandType::Load);
+    }
+    if (consoleButton(ui, "console.pad", padCell, "TOUCHPAD", state.live)) {
+        gPadOpen = true;
     }
 }
 

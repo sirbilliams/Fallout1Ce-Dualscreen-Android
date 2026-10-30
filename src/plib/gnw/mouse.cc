@@ -1,10 +1,12 @@
 #include "plib/gnw/mouse.h"
 
+#include "mui/mui_settings.h"
 #include "plib/color/color.h"
 #include "plib/gnw/dxinput.h"
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/input.h"
 #include "plib/gnw/memory.h"
+#include "plib/gnw/mouse_ctl.h"
 #include "plib/gnw/svga.h"
 #include "plib/gnw/touch.h"
 #include "plib/gnw/vcr.h"
@@ -421,15 +423,38 @@ void mouse_info()
     }
 
     if (mouse_is_hidden) {
+        mouseCtlReset();
         return;
     }
 
     if (mouse_disabled) {
+        mouseCtlReset();
         return;
     }
 
     Gesture gesture;
-    if (touch_get_gesture(&gesture)) {
+    if (settings.touch.direct_touch) {
+        // Direct touch: the gestures of the trackpad mode are not used.
+        while (touch_get_gesture(&gesture)) {
+        }
+    }
+
+    MouseCtlOut ctl;
+    if (mouseCtlUpdate(&ctl)) {
+        if (vcr_state == VCR_STATE_PLAYING) {
+            return;
+        }
+        mouse_simulate_input(ctl.dx, ctl.dy, ctl.buttons);
+        if (ctl.wheelX != 0 || ctl.wheelY != 0) {
+            gMouseWheelX = ctl.wheelX;
+            gMouseWheelY = ctl.wheelY;
+            mouse_buttons |= MOUSE_EVENT_WHEEL;
+            raw_buttons |= MOUSE_EVENT_WHEEL;
+        }
+        return;
+    }
+
+    if (!settings.touch.direct_touch && touch_get_gesture(&gesture)) {
         static int prevx;
         static int prevy;
 

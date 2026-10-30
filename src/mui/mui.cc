@@ -709,6 +709,31 @@ bool MuiContext::pointerDown() const
     return gSurface->pointer.down;
 }
 
+bool MuiContext::pointerPressed() const
+{
+    return gSurface->pointer.pressed;
+}
+
+bool MuiContext::pointerReleased() const
+{
+    return gSurface->pointer.released;
+}
+
+float MuiContext::pointerStartX() const
+{
+    return gSurface->pointer.startX;
+}
+
+float MuiContext::pointerStartY() const
+{
+    return gSurface->pointer.startY;
+}
+
+bool MuiContext::secondFingerDown() const
+{
+    return gSurface->secondFinger.down;
+}
+
 float MuiContext::slider(const std::string& id, const MuiRect& rect, float value, float minValue, float maxValue, bool* dragging)
 {
     // Taller touch area than the track.

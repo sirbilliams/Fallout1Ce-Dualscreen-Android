@@ -35,6 +35,8 @@
 #include "mui/mui_settings.h"
 #include "platform_compat.h"
 #include "plib/gnw/input.h"
+#include "plib/gnw/mouse.h"
+#include "plib/gnw/mouse_ctl.h"
 #include "plib/gnw/svga.h"
 
 namespace fallout {
@@ -568,6 +570,228 @@ namespace {
         return true;
     }
 
+    // ---- mouse controls (FALLOUT_AUTOTEST_MOUSE) -------------------------
+
+    int gMouseL = 0;
+    int gMouseR = 0;
+    int gMouseLeftDown = 0;
+    std::string gMouseDir;
+
+    // A frame of the game's loop without its actions (clicks must not walk the
+    // player), counting button edges as the game sees them.
+    void mouseFrame(int count = 1)
+    {
+        for (int i = 0; i < count; i++) {
+            get_input();
+            mobilePollKey(false);
+            int buttons = mouse_get_buttons();
+            if (buttons & MOUSE_EVENT_LEFT_BUTTON_DOWN) gMouseL++;
+            if (buttons & MOUSE_EVENT_RIGHT_BUTTON_DOWN) gMouseR++;
+            gMouseLeftDown = (buttons & (MOUSE_EVENT_LEFT_BUTTON_DOWN | MOUSE_EVENT_LEFT_BUTTON_REPEAT)) ? 1 : 0;
+            renderPresent();
+        }
+    }
+
+    void mouseFinger(bool bottom, int type, int id, float x, float y)
+    {
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = type;
+        event.tfinger.touchId = bottom ? kMobileBottomTouchId : 1;
+        event.tfinger.fingerId = (bottom ? kMobileBottomTouchId : 1000) + id;
+        event.tfinger.x = x;
+        event.tfinger.y = y;
+        event.tfinger.pressure = type == SDL_FINGERUP ? 0.0f : 1.0f;
+        SDL_PushEvent(&event);
+    }
+
+    void mouseShot(const char* name)
+    {
+        std::string base = gMouseDir + "/" + name;
+        SDL_SaveBMP(gSdlTextureSurface, (base + "-top.bmp").c_str());
+        const unsigned char* bottom = bottomScreenTestFrame();
+        if (bottom != nullptr) saveRgba(bottom, gConsoleWidth, gConsoleHeight, base + "-bottom.bmp");
+    }
+
+    void mouseReport(const char* what)
+    {
+        int x, y;
+        mouse_get_position(&x, &y);
+        SDL_Log("autotest-mouse: t=%u %-28s cursor=(%d,%d) L=%d R=%d leftHeld=%d", compat_ticks(), what, x, y, gMouseL, gMouseR, gMouseLeftDown);
+    }
+
+    bool mouseScenes(const char* dir, int width, int height)
+    {
+        gMouseDir = dir;
+        gConsoleWidth = width;
+        gConsoleHeight = height;
+        mouse_show();
+        mouseFrame(40);
+        mouseReport("start");
+        mouseShot("60-mouse-console");
+
+        // --- Top screen, direct touch.
+        mouseFinger(false, SDL_FINGERDOWN, 1, 0.5f, 0.4f);
+        mouseFrame(2);
+        mouseShot("61-touch-follow");
+        mouseReport("finger down (hover)");
+        mouseFinger(false, SDL_FINGERMOTION, 1, 0.3f, 0.3f);
+        mouseFrame(2);
+        mouseReport("finger moved");
+        mouseFinger(false, SDL_FINGERUP, 1, 0.3f, 0.3f);
+        mouseFrame(1);
+        mouseReport("tap = left click (L+1)");
+        mouseFrame(3);
+        // Hold still = right click on the threshold, nothing on release.
+        int l0 = gMouseL;
+        mouseFinger(false, SDL_FINGERDOWN, 1, 0.6f, 0.5f);
+        mouseFrame(30);
+        mouseReport("hold ~30 frames (no click yet)");
+        mouseFrame(15);
+        mouseReport("hold ~45 frames (R+1)");
+        mouseFinger(false, SDL_FINGERUP, 1, 0.6f, 0.5f);
+        mouseFrame(4);
+        SDL_Log("autotest-mouse: long press left clicks: %d (want 0)", gMouseL - l0);
+        // Two-finger tap = right click.
+        mouseFinger(false, SDL_FINGERDOWN, 1, 0.45f, 0.5f);
+        mouseFinger(false, SDL_FINGERDOWN, 2, 0.55f, 0.5f);
+        mouseFrame(3);
+        mouseFinger(false, SDL_FINGERUP, 1, 0.45f, 0.5f);
+        mouseFinger(false, SDL_FINGERUP, 2, 0.55f, 0.5f);
+        mouseFrame(4);
+        mouseReport("two-finger tap (R+1)");
+
+        // --- Right stick, A, B, R3 (a pretend controller).
+        mouseFinger(false, SDL_FINGERDOWN, 1, 0.2f, 0.5f);
+        mouseFrame(1);
+        mouseFinger(false, SDL_FINGERMOTION, 1, 0.2f, 0.5f);
+        mouseFinger(false, SDL_FINGERUP, 1, 0.2f, 0.5f);
+        mouseFrame(8);
+        mouseReport("cursor parked");
+        mouseCtlTestPad(true, 1.0f, 0.0f, 0);
+        mouseFrame(30);
+        mouseReport("stick right full, 30 frames");
+        mouseCtlTestPad(true, 0.0f, 0.5f, 0);
+        mouseFrame(30);
+        mouseReport("stick down half (curve)");
+        mouseCtlTestPad(true, 0.15f, 0.15f, 0);
+        mouseFrame(10);
+        mouseReport("inside dead zone (no move)");
+        mouseShot("62-stick-moved");
+        mouseCtlTestPad(true, 0, 0, 1);
+        mouseFrame(2);
+        SDL_Log("autotest-mouse: A held, leftHeld=%d", gMouseLeftDown);
+        mouseCtlTestPad(true, 0, 0, 0);
+        mouseFrame(3);
+        mouseReport("A released");
+        mouseCtlTestPad(true, 0, 0, 2);
+        mouseFrame(3);
+        mouseCtlTestPad(true, 0, 0, 0);
+        mouseFrame(3);
+        mouseReport("B = right click (R+1)");
+        mouseCtlTestPad(true, 0, 0, 4);
+        mouseFrame(6);
+        mouseCtlTestPad(true, 0, 0, 0);
+        mouseFrame(4);
+        mouseReport("R3 short = left click (L+1)");
+        int r0 = gMouseR;
+        l0 = gMouseL;
+        mouseCtlTestPad(true, 0, 0, 4);
+        mouseFrame(12);
+        SDL_Log("autotest-mouse: R3 held ~12 frames (<400ms): R+%d (want 0)", gMouseR - r0);
+        mouseFrame(30);
+        SDL_Log("autotest-mouse: R3 held ~42 frames (>400ms): R+%d (want 1, fired while held)", gMouseR - r0);
+        mouseCtlTestPad(true, 0, 0, 0);
+        mouseFrame(4);
+        SDL_Log("autotest-mouse: R3 long released: L+%d (want 0) R+%d (want 1)", gMouseL - l0, gMouseR - r0);
+        mouseCtlTestPad(false, 0, 0, 0);
+
+        // --- Touchpad page on the bottom screen.
+        float bx, by;
+        bool onBottom = false;
+        if (!muiGetWidgetCenter("console.pad", &bx, &by, &onBottom) || !onBottom) {
+            SDL_Log("autotest-mouse: TOUCHPAD button not found");
+            return false;
+        }
+        mouseFinger(true, SDL_FINGERDOWN, 7, bx, by);
+        mouseFrame(3);
+        mouseFinger(true, SDL_FINGERUP, 7, bx, by);
+        mouseFrame(20);
+        mouseShot("63-pad-page");
+        if (!muiGetWidgetCenter("pad.area", &bx, &by, &onBottom)) {
+            SDL_Log("autotest-mouse: pad page not open");
+            return false;
+        }
+        // Slow drag, then a fast one: the fast one goes farther per pad pixel.
+        mouseFinger(true, SDL_FINGERDOWN, 7, bx, by);
+        mouseFrame(2);
+        mouseReport("pad finger down");
+        float x = bx;
+        for (int i = 0; i < 8; i++) {
+            x += 0.006f;
+            mouseFinger(true, SDL_FINGERMOTION, 7, x, by);
+            mouseFrame(2);
+        }
+        mouseReport("pad slow drag (8 x 0.006)");
+        for (int i = 0; i < 4; i++) {
+            x += 0.032f;
+            mouseFinger(true, SDL_FINGERMOTION, 7, x, by);
+            mouseFrame(1);
+        }
+        mouseFinger(true, SDL_FINGERUP, 7, x, by);
+        mouseFrame(4);
+        mouseReport("pad fast drag (4 x 0.032)");
+        mouseShot("64-pad-dragged");
+        // Tap.
+        mouseFinger(true, SDL_FINGERDOWN, 7, bx, by);
+        mouseFrame(3);
+        mouseFinger(true, SDL_FINGERUP, 7, bx, by);
+        mouseFrame(4);
+        mouseReport("pad tap (L+1)");
+        // Hold then drag = carry.
+        mouseFinger(true, SDL_FINGERDOWN, 7, bx, by);
+        mouseFrame(30);
+        mouseReport("pad hold 480ms (left down)");
+        mouseShot("65-pad-holding");
+        for (int i = 0; i < 6; i++) {
+            mouseFinger(true, SDL_FINGERMOTION, 7, bx - 0.02f * (i + 1), by + 0.01f * (i + 1));
+            mouseFrame(2);
+        }
+        mouseReport("pad carry (still held)");
+        mouseFinger(true, SDL_FINGERUP, 7, bx - 0.12f, by + 0.06f);
+        mouseFrame(4);
+        mouseReport("pad carry dropped (left up)");
+        // Two-finger tap = right click.
+        mouseFinger(true, SDL_FINGERDOWN, 7, bx, by);
+        mouseFinger(true, SDL_FINGERDOWN, 8, bx + 0.05f, by);
+        mouseFrame(3);
+        mouseFinger(true, SDL_FINGERUP, 7, bx, by);
+        mouseFinger(true, SDL_FINGERUP, 8, bx + 0.05f, by);
+        mouseFrame(4);
+        mouseReport("pad two-finger tap (R+1)");
+        // Back to the console.
+        if (!muiGetWidgetCenter("frame.back", &bx, &by, &onBottom)) return false;
+        mouseFinger(true, SDL_FINGERDOWN, 7, bx, by);
+        mouseFrame(3);
+        mouseFinger(true, SDL_FINGERUP, 7, bx, by);
+        mouseFrame(20);
+        mouseShot("66-pad-closed");
+
+        // --- Controls page of the options.
+        muiOptionsShow();
+        mouseFrame(30);
+        mouseShot("67-options");
+        if (!muiGetWidgetCenter("options.controls", &bx, &by, &onBottom)) return false;
+        mouseFinger(true, SDL_FINGERDOWN, 7, bx, by);
+        mouseFrame(3);
+        mouseFinger(true, SDL_FINGERUP, 7, bx, by);
+        mouseFrame(30);
+        mouseShot("68-controls");
+        muiOptionsHide();
+        mouseFrame(10);
+        return true;
+    }
+
 } // namespace
 
 bool devAutotestGameRun()
@@ -590,6 +814,11 @@ bool devAutotestGameRun()
         }
     }
     if (!captureScene(dir, "10-dashboard-ingame", width, height)) return false;
+    if (getenv("FALLOUT_AUTOTEST_MOUSE") != nullptr) {
+        bool mouseOk = mouseScenes(dir, width, height);
+        bottomScreenSetTest(0, 0, 1.0f);
+        return mouseOk;
+    }
     if (getenv("FALLOUT_AUTOTEST_CONSOLE") != nullptr) {
         bool consoleOk = consoleScenes(dir, width, height);
         bottomScreenSetTest(0, 0, 1.0f);

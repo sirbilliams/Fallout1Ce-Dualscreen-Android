@@ -1,4 +1,5 @@
 #include "plib/gnw/dxinput.h"
+#include "plib/gnw/mouse_ctl.h"
 
 namespace fallout {
 
@@ -16,6 +17,8 @@ bool dxinput_init()
     if (SDL_InitSubSystem(SDL_INIT_EVENTS) != 0) {
         return false;
     }
+
+    mouseCtlInit();
 
     if (!dxinput_mouse_init()) {
         goto err;
@@ -37,6 +40,7 @@ err:
 // 0x4E0478
 void dxinput_exit()
 {
+    mouseCtlExit();
     SDL_QuitSubSystem(SDL_INIT_EVENTS);
 }
 

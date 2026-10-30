@@ -6,6 +6,7 @@
 #include "audio_engine.h"
 #include "mobile_contracts.h"
 #include "mui/mui.h"
+#include "mui/mui_settings.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
@@ -14,6 +15,7 @@
 #include "plib/gnw/grbuf.h"
 #include "plib/gnw/intrface.h"
 #include "plib/gnw/memory.h"
+#include "plib/gnw/mouse_ctl.h"
 #include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
 #include "plib/gnw/touch.h"
@@ -1107,15 +1109,24 @@ void GNW95_process_message()
             break;
         case SDL_FINGERDOWN:
             if (muiHandleFingerEvent(&e)) break;
-            if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_start(&(e.tfinger));
+            if (e.tfinger.touchId != kMobileBottomTouchId) {
+                touch_handle_start(&(e.tfinger));
+                if (settings.touch.direct_touch) mouseCtlFingerStart(&(e.tfinger));
+            }
             break;
         case SDL_FINGERMOTION:
             if (muiHandleFingerEvent(&e)) break;
-            if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_move(&(e.tfinger));
+            if (e.tfinger.touchId != kMobileBottomTouchId) {
+                touch_handle_move(&(e.tfinger));
+                if (settings.touch.direct_touch) mouseCtlFingerMove(&(e.tfinger));
+            }
             break;
         case SDL_FINGERUP:
             if (muiHandleFingerEvent(&e)) break;
-            if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_end(&(e.tfinger));
+            if (e.tfinger.touchId != kMobileBottomTouchId) {
+                touch_handle_end(&(e.tfinger));
+                if (settings.touch.direct_touch) mouseCtlFingerEnd(&(e.tfinger));
+            }
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
@@ -1124,6 +1135,10 @@ void GNW95_process_message()
                 keyboardData.down = (e.key.state & SDL_PRESSED) != 0;
                 GNW95_process_key(&keyboardData);
             }
+            break;
+        case SDL_CONTROLLERDEVICEADDED:
+        case SDL_CONTROLLERDEVICEREMOVED:
+            mouseCtlHandleEvent(&e);
             break;
         case SDL_RENDER_DEVICE_RESET:
             handleWindowSizeChanged();

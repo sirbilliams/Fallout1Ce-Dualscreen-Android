@@ -204,6 +204,14 @@ public:
     float pointerX() const;
     float pointerY() const;
     bool pointerDown() const;
+    // This frame's transitions of the finger, and where / when it went down
+    // (`compat_ticks`), for the touchpad.
+    bool pointerPressed() const;
+    bool pointerReleased() const;
+    float pointerStartX() const;
+    float pointerStartY() const;
+    // A second finger is down with the captured one.
+    bool secondFingerDown() const;
 
     // Content under [rect] (maps): one finger drags it, two fingers pinch
     // it (zoom around them). Returns true while touched. [tapped] - the finger

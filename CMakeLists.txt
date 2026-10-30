@@ -297,6 +297,7 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
     "src/pointer_registry.cc"
     "src/pointer_registry.h"
     "src/plib/gnw/touch.cc"
+    "src/plib/gnw/mouse_ctl.cc"
     "src/plib/gnw/touch.h"
 )
 
