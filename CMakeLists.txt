@@ -36,6 +36,7 @@ target_sources(${EXECUTABLE_NAME} PRIVATE
     src/mui/mui.cc
     src/mui/mui_console.cc
     src/mui/mui_live_map.cc
+    src/mui/mui_combat_page.cc
     src/mui/mui_dash.cc
     src/mui/mui_draw.cc
     src/mui/mui_gameskin.cc

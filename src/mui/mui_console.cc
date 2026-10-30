@@ -510,6 +510,13 @@ void muiDashConsole(MuiContext& ui)
         muiLiveMapPage(ui, &gMapOpen);
         return;
     }
+    if (muiCombatPageActive()) {
+        int request = 0;
+        muiCombatPage(ui, &request);
+        gMapOpen = request == 1;
+        gPadOpen = request == 2;
+        return;
+    }
     MuiRect screen = ui.screenRect();
 
     // Heights in dp; a screen shorter than the layout squeezes the gaps and
