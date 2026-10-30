@@ -15,7 +15,7 @@ Early, but playable.
 - Pip-Boy 2000 theme by default, plus a Classic theme; your choice persists.
 - 960x540 widescreen at 2x on the Thor, with a wide interface bar.
 - Procedural CRT backdrop on the bottom screen.
-- The bottom screen is currently a display dashboard; an interactive console is in progress.
+- Interactive bottom screen: status card (tap for the Pip-Boy), INV / CHA / PIP / MAP, MENU / SAVE / LOAD, your weapon with attack, swap and aim mode, and END TURN / END COMBAT with an AP bar in combat.
 
 See [docs/ui-style.md](docs/ui-style.md) for the UI style guide.
 
