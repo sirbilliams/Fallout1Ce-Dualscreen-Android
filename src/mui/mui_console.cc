@@ -100,8 +100,9 @@ namespace {
         }
         ui.mark(id, rect);
         muiSkinButton(ui, rect, false, false);
-        muiGameButtonLabel(ui, rect, u(label), muiRgb(0x6A5F2A));
-        muiFillRoundRect(rect, ui.dp(3.0f), muiRgb(0x000000, 150));
+        muiGameButtonLabel(ui, rect, u(label), muiRgb(0x9A8A40));
+        // Dimmed, but the label stays readable.
+        muiFillRoundRect(rect, ui.dp(3.0f), muiRgb(0x000000, 85));
         return false;
     }
 
@@ -135,7 +136,7 @@ namespace {
 
         Object* item = nullptr;
         intface_get_current_item(&item);
-        hand.item = item != nullptr ? muiDecodeGameText(item_name(item)) : u("UNARMED");
+        hand.item = item != nullptr ? muiDecodeGameText(item_name(item)) : u("Fists");
 
         char detail[96] = "";
         int hitMode = 0;
@@ -219,7 +220,7 @@ namespace {
         float half = inner.w * 0.5f;
         MuiRect placeRect = { inner.x, y, half, ui.dp(22.0f) };
         muiDrawTextAligned(place, placeRect, muiFitTextSize(place, half, ui.dp(16.0f), ui.dp(10.0f)), theme.accent, MuiAlign::Start, MuiAlign::Center);
-        std::u32string who = muiDecodeGameText(critter_name(obj_dude)) + u(" \xC2\xB7 LVL ") + muiDecodeUtf8(std::to_string(stat_pc_get(PC_STAT_LEVEL)).c_str());
+        std::u32string who = muiPlayerName() + u(" \xC2\xB7 LVL ") + muiDecodeUtf8(std::to_string(stat_pc_get(PC_STAT_LEVEL)).c_str());
         MuiRect whoRect = { inner.x + half, y, half, ui.dp(22.0f) };
         muiDrawTextAligned(who, whoRect, muiFitTextSize(who, half, ui.dp(15.0f), ui.dp(10.0f)), theme.text, MuiAlign::End, MuiAlign::Center);
         y += ui.dp(26.0f);
@@ -320,7 +321,7 @@ namespace {
             }
             snprintf(label, sizeof(label), "AP %d/%d", current, maximum);
         } else {
-            snprintf(label, sizeof(label), "AP \xE2\x80\x94  NO COMBAT");
+            snprintf(label, sizeof(label), "AP: no combat");
         }
         // The count over the pips, with a dark outline-ish plate for legibility.
         std::u32string text = muiDecodeUtf8(label);
@@ -392,9 +393,7 @@ namespace {
             return;
         }
 
-        float hintHeight = ui.dp(54.0f);
-        MuiRect area = { content.x, content.y, content.w, content.h - hintHeight - ui.dp(8.0f) };
-        MuiRect hint = { content.x, area.bottom() + ui.dp(8.0f), content.w, hintHeight };
+        MuiRect area = content;
 
         ui.panel(area);
         bool pressed = false;
@@ -462,21 +461,58 @@ namespace {
             }
         }
 
-        // Nothing but the trackpad's own marks: a faint cross, the state.
-        MuiRect middle = { area.x, area.centerY() - ui.dp(36.0f), area.w, ui.dp(40.0f) };
-        muiDrawTextAligned(U"TOUCHPAD", middle, ui.dp(20.0f), theme.textDim, MuiAlign::Center, MuiAlign::Center);
-        if (gPad.held) {
-            MuiRect holding = { area.x, area.bottom() - ui.dp(48.0f), area.w, ui.dp(36.0f) };
-            muiDrawTextAligned(U"HOLDING", holding, ui.dp(16.0f), theme.accent, MuiAlign::Center, MuiAlign::Center);
+        // The trackpad's own marks: a fine grid, a centre cross, corner ticks,
+        // a ring under the finger and the state.
+        MuiInk ink = muiSkinInk();
+        muiPushClip(area);
+        MuiColor grid = ink.text.withAlpha(16);
+        float cells = 8.0f;
+        for (int line = 1; line < static_cast<int>(cells); line++) {
+            muiFillRect({ area.x + area.w * line / cells, area.y, std::max(1.0f, ui.dp(0.5f)), area.h }, grid);
         }
+        float rows = std::max(1.0f, std::round(area.h / (area.w / cells)));
+        for (int line = 1; line < static_cast<int>(rows); line++) {
+            muiFillRect({ area.x, area.y + area.h * line / rows, area.w, std::max(1.0f, ui.dp(0.5f)) }, grid);
+        }
+        MuiColor axis = ink.text.withAlpha(44);
+        muiFillRect({ area.centerX(), area.y, std::max(1.0f, ui.dp(0.5f)), area.h }, axis);
+        muiFillRect({ area.x, area.centerY(), area.w, std::max(1.0f, ui.dp(0.5f)) }, axis);
+        muiStrokeCircle(area.centerX(), area.centerY(), ui.dp(34.0f), std::max(1.0f, ui.dp(0.75f)), axis);
+        float tick = ui.dp(18.0f);
+        float edge = ui.dp(10.0f);
+        float thin = std::max(2.0f, ui.dp(1.5f));
+        MuiColor corner = ink.accent.withAlpha(150);
+        for (int cx = 0; cx < 2; cx++) {
+            for (int cy = 0; cy < 2; cy++) {
+                float px = cx == 0 ? area.x + edge : area.right() - edge;
+                float py = cy == 0 ? area.y + edge : area.bottom() - edge;
+                muiFillRect({ cx == 0 ? px : px - tick, py - (cy == 0 ? 0.0f : thin), tick, thin }, corner);
+                muiFillRect({ px - (cx == 0 ? 0.0f : thin), cy == 0 ? py : py - tick, thin, tick }, corner);
+            }
+        }
+        if (gPad.on) {
+            float fx = ui.pointerX();
+            float fy = ui.pointerY();
+            muiStrokeCircle(fx, fy, ui.dp(gPad.held ? 30.0f : 24.0f), thin, ink.accent);
+            muiFillCircle(fx, fy, ui.dp(5.0f), ink.accent);
+        }
+        if (gPad.held) {
+            MuiRect holding = { area.right() - ui.dp(150.0f), area.y + ui.dp(20.0f), ui.dp(130.0f), ui.dp(34.0f) };
+            muiFillRoundRect(holding, ui.dp(4.0f), muiRgb(0x000000, 170));
+            muiStrokeRoundRect(holding, ui.dp(4.0f), thin, ink.accent);
+            muiDrawTextAligned(U"HOLDING", holding, ui.dp(13.0f), ink.accent, MuiAlign::Center, MuiAlign::Center);
+        }
+        muiPopClip();
 
-        std::u32string line1 = u("drag = move cursor \xC2\xB7 tap = click \xC2\xB7 two-finger tap = right click");
-        std::u32string line2 = u("hold then drag = carry");
-        MuiRect first = { hint.x, hint.y, hint.w, hint.h / 2.0f };
-        MuiRect second = { hint.x, hint.y + hint.h / 2.0f, hint.w, hint.h / 2.0f };
-        float size = std::min(muiFitTextSize(line1, hint.w, ui.dp(13.0f), ui.dp(10.0f)), ui.dp(13.0f));
-        muiDrawTextAligned(line1, first, size, theme.text, MuiAlign::Center, MuiAlign::Center);
-        muiDrawTextAligned(line2, second, size, theme.text, MuiAlign::Center, MuiAlign::Center);
+        // How to use it, in the surface's lower part, clear of the edges.
+        const char* hints[4] = { "Drag: move the cursor", "Tap: click", "Two-finger tap: right click", "Hold, then drag: carry" };
+        float size = ui.dp(11.0f);
+        float rowHeight = ui.dp(26.0f);
+        MuiRect block = { area.x + ui.dp(28.0f), area.bottom() - ui.dp(30.0f) - rowHeight * 2.0f, area.w - ui.dp(56.0f), rowHeight * 2.0f };
+        for (int index = 0; index < 4; index++) {
+            MuiRect cellRect = { block.x + (index % 2) * block.w / 2.0f, block.y + (index / 2) * rowHeight, block.w / 2.0f, rowHeight };
+            muiDrawTextEllipsis(muiDecodeUtf8(hints[index]), cellRect, size, ink.dim, MuiAlign::Start, MuiAlign::Center);
+        }
     }
 
 } // namespace
@@ -548,11 +584,12 @@ void muiDashConsole(MuiContext& ui)
 
     // MENU / SAVE / LOAD one share each, TOUCHPAD a share and a half.
     MuiRect system = { x, y, width, systemHeight };
-    float unit = (width - gap * 4.0f) / 5.5f;
+    // Shares 1 / 1 / 1 / 1.45 / 1.45: SETTINGS needs the room to keep the same lettering size.
+    float unit = (width - gap * 4.0f) / 5.9f;
     MuiRect menuCell = { x, y, unit, systemHeight };
     MuiRect saveCell = { menuCell.right() + gap, y, unit, systemHeight };
     MuiRect loadCell = { saveCell.right() + gap, y, unit, systemHeight };
-    MuiRect settingsCell = { loadCell.right() + gap, y, unit, systemHeight };
+    MuiRect settingsCell = { loadCell.right() + gap, y, unit * 1.45f, systemHeight };
     MuiRect padCell = { settingsCell.right() + gap, y, system.right() - settingsCell.right() - gap, systemHeight };
     if (consoleButton(ui, "console.menu", menuCell, "MENU", state.live)) {
         send(MobileCommandType::Menu);

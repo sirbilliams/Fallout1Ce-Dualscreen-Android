@@ -7,6 +7,7 @@
 #include "game/mainmenu.h"
 #include "game/version.h"
 #include "mui/mui_gameskin.h"
+#include "mui/mui_skin.h"
 
 namespace fallout {
 
@@ -52,6 +53,22 @@ namespace {
         if (muiGameArtSize(MuiArtGroup::Interface, "mainmenu", &artWidth, &artHeight) && artWidth > 0) {
             MuiRect fit = muiFitRect(picture.inset(ui.dp(6.0f)), static_cast<float>(artWidth), static_cast<float>(artHeight));
             muiGameDrawArt(MuiArtGroup::Interface, "mainmenu", fit);
+            // The picture's riveted plate was left blank for the original's button
+            // labels: a readout in it carries the version and what to do.
+            MuiRect plate = { fit.x + fit.w * 0.632f, fit.y + fit.h * 0.05f, fit.w * 0.325f, fit.h * 0.56f };
+            muiSkinWell(ui, plate);
+            MuiInk ink = muiSkinInk();
+            MuiRect text = plate.inset(ui.dp(3.0f), ui.dp(6.0f));
+            char engine[VERSION_MAX];
+            getverstr(engine, sizeof(engine));
+            std::string port = muiPortVersion();
+            size_t space = port.find(' ');
+            std::u32string lines[] = { muiDecodeGameText(engine), U"Dual screen", U"Port " + muiDecodeUtf8(port.substr(0, space).c_str()), space == std::string::npos ? U"" : muiDecodeUtf8(port.substr(space + 1).c_str()), U"Touch a button", U"to begin" };
+            float lineHeight = text.h / 6.0f;
+            for (int index = 0; index < 6; index++) {
+                MuiRect line = { text.x, text.y + lineHeight * index, text.w, lineHeight };
+                muiDrawTextEllipsis(lines[index], line, muiFitTextSize(lines[index], line.w, ui.dp(10.5f), ui.dp(10.0f)), index == 0 ? ink.accent : (index >= 4 ? ink.text : ink.dim), MuiAlign::Center, MuiAlign::Center);
+            }
         }
 
         float gap = ui.dp(10.0f);

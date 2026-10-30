@@ -1,5 +1,6 @@
 #include "mui/mui_dash.h"
 #include "mui/mui_gameskin.h"
+#include "mui/mui_screens.h"
 #include "mui/mui_settings.h"
 #include "mui/mui_skin.h"
 
@@ -352,12 +353,20 @@ void muiDashCompanion(MuiContext& ui)
     };
 
     if (!inGame()) {
-        // Outside a game: the title.
-        float y = monitor(ui.dp(84.0f), false);
+        // Outside a game: the title, what is happening and the port's version.
+        float y = monitor(ui.dp(168.0f), false);
         MuiRect title = { x, y, width, ui.dp(56.0f) };
         muiDrawTextAligned(muiDecodeUtf8("FALLOUT"), title, ui.dp(44.0f), theme.accent, MuiAlign::Center, MuiAlign::Center);
-        MuiRect subtitle = { x, title.bottom(), width, ui.dp(28.0f) };
-        muiDrawTextAligned(text(kTextDualScreen, "Dual screen"), subtitle, ui.dp(16.0f), theme.textDim, MuiAlign::Center, MuiAlign::Center);
+        MuiRect subtitle = { x, title.bottom(), width, ui.dp(26.0f) };
+        muiDrawTextAligned(muiDecodeUtf8("Dual-screen edition"), subtitle, ui.dp(15.0f), theme.textDim, MuiAlign::Center, MuiAlign::Center);
+        y = subtitle.bottom() + ui.dp(8.0f);
+        muiFillRect({ x + width * 0.1f, y, width * 0.8f, std::max(ui.dp(1.0f), 1.0f) }, theme.textDim.withAlpha(120));
+        y += ui.dp(10.0f);
+        MuiRect hintA = { x, y, width, ui.dp(24.0f) };
+        muiDrawTextAligned(muiDecodeUtf8("Waiting for a game"), hintA, ui.dp(15.0f), theme.text, MuiAlign::Center, MuiAlign::Center);
+        MuiRect hintB = { x, hintA.bottom(), width, ui.dp(24.0f) };
+        std::u32string hint = muiDecodeUtf8("Your status shows here once you play");
+        muiDrawTextAligned(hint, hintB, muiFitTextSize(hint, width, ui.dp(13.0f), ui.dp(10.0f)), theme.textDim, MuiAlign::Center, MuiAlign::Center);
         return;
     }
 
@@ -416,7 +425,7 @@ void muiDashCompanion(MuiContext& ui)
     // Who: name and level, then HP.
     char level[32];
     snprintf(level, sizeof(level), muiText(kTextLevel, "Level %d"), stat_pc_get(PC_STAT_LEVEL));
-    std::u32string who = muiDecodeGameText(critter_name(obj_dude)) + U" \u00B7 " + muiDecodeGameText(level);
+    std::u32string who = muiPlayerName() + U" \u00B7 " + muiDecodeGameText(level);
     MuiRect whoRect = { x, y, width, ui.dp(24.0f) };
     muiDrawTextAligned(who, whoRect, muiFitTextSize(who, width, ui.dp(17.0f), ui.dp(12.0f)), theme.text, MuiAlign::Center, MuiAlign::Center);
     y = whoRect.bottom() + ui.dp(10.0f);
