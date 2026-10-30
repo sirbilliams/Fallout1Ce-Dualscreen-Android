@@ -14,6 +14,7 @@
 #include "bottom_screen.h"
 #include "game/combat.h"
 #include "game/config.h"
+#include "game/critter.h"
 #include "game/editor.h"
 #include "game/game.h"
 #include "game/gconfig.h"
@@ -28,6 +29,7 @@
 #include "game/proto.h"
 #include "game/proto_types.h"
 #include "game/scripts.h"
+#include "game/tile.h"
 #include "game/worldmap.h"
 #include "mobile_contracts.h"
 #include "mui/mui.h"
@@ -606,6 +608,145 @@ namespace {
         return true;
     }
 
+    // ---- bottom pages (FALLOUT_AUTOTEST_PAGES): the live map and the combat panel ----
+
+    int gPagesStep = 0;
+
+    Object* spawnFoe()
+    {
+        Object* chosen = nullptr;
+        for (int pid = 0x1000001; pid < 0x1000030 && chosen == nullptr; pid++) {
+            Object* critter = nullptr;
+            if (obj_pid_new(&critter, pid) != 0 || critter == nullptr) continue;
+            const char* name = critter_name(critter);
+            SDL_Log("autotest: critter pid %x: %s", pid, name != nullptr ? name : "?");
+            if (name != nullptr && (strstr(name, "Rat") != nullptr || strstr(name, "corpion") != nullptr || strstr(name, "Dog") != nullptr)) {
+                chosen = critter;
+            } else {
+                obj_erase_object(critter, nullptr);
+            }
+        }
+        if (chosen == nullptr) return nullptr;
+        int tile = tile_num_in_direction(obj_dude->tile, 2, 4);
+        if (obj_connect(chosen, tile, obj_dude->elevation, nullptr) != 0) return nullptr;
+        chosen->data.critter.combat.team = 99;
+        return chosen;
+    }
+
+    Object* gFoe = nullptr;
+
+    Uint32 pagesCombatTimer(Uint32, void*)
+    {
+        SDL_Log("autotest: panel step %d: dude ap %d hp %d, foe hp %d, turn %d", gPagesStep, obj_dude->data.critter.combat.ap, critter_get_hits(obj_dude), gFoe != nullptr ? critter_get_hits(gFoe) : -1, combat_whose_turn() == obj_dude ? 1 : 0);
+        switch (gPagesStep++) {
+        case 0:
+            consoleShot("71-combat");
+            return 500;
+        case 1:
+            consoleShot("71b-combat-your-turn");
+            consoleTapScripted("combat.aim.0");
+            return 500;
+        case 2:
+            consoleShot("72-combat-aim");
+            return 300;
+        case 3:
+            consoleTapScripted("combat.part.0");
+            return 2500;
+        case 4:
+            consoleShot("73-combat-after-aimed");
+            consoleTapScripted("combat.aimback");
+            consoleTapScripted("combat.target.0");
+            return 2500;
+        case 5:
+            consoleShot("73b-combat-after-attack");
+            return 300;
+        case 6:
+            consoleTapScripted("combat.mode.1");
+            return 400;
+        case 7:
+            consoleShot("74-combat-mode");
+            return 300;
+        default:
+            if (isInCombat()) {
+                // END COMBAT on the panel (disabled in the enemy's turn).
+                consoleTapScripted("combat.endcombat");
+                return 400;
+            }
+            return 0;
+        }
+    }
+
+    bool pagesScenes(const char* dir, int width, int height)
+    {
+        gConsoleDir = dir;
+        gConsoleWidth = width;
+        gConsoleHeight = height;
+
+        Object* weapon = nullptr;
+        Inventory* inventory = &obj_dude->data.inventory;
+        for (int i = 0; i < inventory->length; i++) {
+            Object* item = inventory->items[i].item;
+            if (item_get_type(item) == ITEM_TYPE_WEAPON) {
+                weapon = item;
+                break;
+            }
+        }
+        // Unarmed: the test character's art has no knife swing here, so a weapon would not attack.
+        (void)weapon;
+
+        consoleLoop(40);
+        const char* only = getenv("FALLOUT_AUTOTEST_PAGES");
+        bool wantMap = strcmp(only, "combat") != 0;
+        bool wantCombat = strcmp(only, "map") != 0;
+        // The live map: open, legend, center, a tap on open ground walks.
+        if (wantMap) {
+            consoleTapScripted("console.map");
+            consoleLoop(30);
+            consoleShot("60-livemap");
+            consoleTapScripted("map.legend");
+            consoleLoop(20);
+            consoleShot("61-livemap-legend");
+            int before = obj_dude->tile;
+            float x, y;
+            bool onBottom = false;
+            if (muiGetWidgetCenter("map.view", &x, &y, &onBottom)) {
+                consoleFinger(true, x + 0.12f, y + 0.08f);
+                consoleLoop(3);
+                consoleFinger(false, x + 0.12f, y + 0.08f);
+                consoleLoop(120);
+                SDL_Log("autotest: live map tap walk: tile %d -> %d", before, obj_dude->tile);
+            } else {
+                SDL_Log("autotest: map.view not found");
+            }
+            consoleShot("62-livemap-walked");
+            consoleTapScripted("map.center");
+            consoleLoop(20);
+            consoleTapScripted("frame.back");
+            consoleLoop(20);
+            consoleShot("63-console-after-map");
+        }
+        if (!wantCombat) return true;
+
+        // The panel: a foe, combat starts with its attack, dude's turn follows.
+        Object* foe = spawnFoe();
+        if (foe == nullptr) {
+            SDL_Log("autotest: no foe could be made");
+            return false;
+        }
+        STRUCT_664980 attack;
+        memset(&attack, 0, sizeof(attack));
+        attack.attacker = foe;
+        attack.defender = obj_dude;
+        gFoe = foe;
+        gPagesStep = 0;
+        schedule(1500, pagesCombatTimer);
+        combat(&attack);
+        SDL_Log("autotest: combat returned, in combat now: %d", isInCombat() ? 1 : 0);
+        consoleLoop(40);
+        consoleShot("75-after-combat");
+        return true;
+    }
+
     // ---- mouse controls (FALLOUT_AUTOTEST_MOUSE) -------------------------
 
     int gMouseL = 0;
@@ -946,6 +1087,11 @@ bool devAutotestGameRun()
         bool mouseOk = mouseScenes(dir, width, height);
         bottomScreenSetTest(0, 0, 1.0f);
         return mouseOk;
+    }
+    if (getenv("FALLOUT_AUTOTEST_PAGES") != nullptr) {
+        bool pagesOk = pagesScenes(dir, width, height);
+        bottomScreenSetTest(0, 0, 1.0f);
+        return pagesOk;
     }
     if (getenv("FALLOUT_AUTOTEST_CONSOLE") != nullptr) {
         bool consoleOk = consoleScenes(dir, width, height);

@@ -1,5 +1,6 @@
 #include "mui/mui_dash.h"
 #include "mui/mui_gameskin.h"
+#include "mui/mui_pages.h"
 #include "mui/mui_settings.h"
 #include "mui/mui_skin.h"
 
@@ -357,6 +358,8 @@ namespace {
     constexpr unsigned int kTwoTapMs = 450;
 
     bool gPadOpen = false;
+    bool gMapOpen = false;
+    bool gWasCombat = false;
 
     struct PadTouch {
         bool on = false;
@@ -497,6 +500,16 @@ void muiDashConsole(MuiContext& ui)
         padPage(ui);
         return;
     }
+    // Pages the console hands its slot to: the live map (MAP), and in a fight
+    // the combat panel (mui_live_map.cc, mui_combat_page.cc).
+    if (state.inCombat && !gWasCombat) {
+        gMapOpen = false;
+    }
+    gWasCombat = state.inCombat;
+    if (gMapOpen) {
+        muiLiveMapPage(ui, &gMapOpen);
+        return;
+    }
     MuiRect screen = ui.screenRect();
 
     // Heights in dp; a screen shorter than the layout squeezes the gaps and
@@ -535,7 +548,11 @@ void muiDashConsole(MuiContext& ui)
     };
     for (int index = 0; index < 4; index++) {
         if (consoleButton(ui, items[index].id, cell(nav, index, 4, gap), items[index].label, items[index].enabled)) {
-            send(MobileCommandType::OpenScreen, static_cast<int>(items[index].screen));
+            if (items[index].screen == MobileScreen::Map) {
+                gMapOpen = true;
+            } else {
+                send(MobileCommandType::OpenScreen, static_cast<int>(items[index].screen));
+            }
         }
     }
     y += navHeight + gap;
