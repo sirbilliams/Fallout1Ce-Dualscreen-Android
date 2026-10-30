@@ -7,6 +7,7 @@ namespace fallout {
 // mobile screen is opened on a test bottom display and captured as BMP into
 // $FALLOUT_AUTOTEST_DIR (top: <name>-top.bmp, bottom: <name>-bottom.bmp).
 // Returns false on failure.
+void devAutotestStartMovieShots();
 bool devAutotestRun();
 
 // Same for the screens that need a loaded game (called with a map loaded).

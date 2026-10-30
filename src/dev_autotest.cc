@@ -207,6 +207,30 @@ namespace {
 
 } // namespace
 
+namespace {
+    std::string gMovieShotDir;
+    int gMovieShotIndex = 0;
+
+    Uint32 movieShotTimer(Uint32 interval, void*)
+    {
+        char name[32];
+        snprintf(name, sizeof(name), "/movie-%03d.bmp", gMovieShotIndex++);
+        if (gSdlTextureSurface != nullptr) SDL_SaveBMP(gSdlTextureSurface, (gMovieShotDir + name).c_str());
+        return interval;
+    }
+} // namespace
+
+// FALLOUT_AUTOTEST_MOVIE_SHOTS=<dir>: saves the top screen every second from
+// startup (the intro movies play when this is set).
+void devAutotestStartMovieShots()
+{
+    const char* dir = getenv("FALLOUT_AUTOTEST_MOVIE_SHOTS");
+    if (dir == nullptr) return;
+    gMovieShotDir = dir;
+    SDL_InitSubSystem(SDL_INIT_TIMER);
+    SDL_AddTimer(1000, movieShotTimer, nullptr);
+}
+
 bool devAutotestRun()
 {
     if (!contracts()) return false;

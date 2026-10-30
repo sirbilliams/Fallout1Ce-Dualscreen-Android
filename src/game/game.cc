@@ -1,3 +1,4 @@
+#include "dev_autotest.h"
 #include "game/game.h"
 
 #include <stdio.h>
@@ -127,6 +128,10 @@ DB_DATABASE* critter_db_handle;
 int game_init(const char* windowTitle, bool isMapper, int font, int flags, int argc, char** argv)
 {
     char path[COMPAT_MAX_PATH];
+
+#ifndef __ANDROID__
+    devAutotestStartMovieShots();
+#endif
 
     if (gmemory_init() == -1) {
         return -1;

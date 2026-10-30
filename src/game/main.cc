@@ -106,6 +106,12 @@ int gnw_main(int argc, char** argv)
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--dev-autotest") == 0) devAutotest = true;
     }
+#ifndef __ANDROID__
+    if (devAutotest && getenv("FALLOUT_AUTOTEST_MOVIE_SHOTS") != nullptr) {
+        gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
+        gmovie_play(MOVIE_INTRO, 0);
+    }
+#endif
     if (!devAutotest) {
         gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
         gmovie_play(MOVIE_INTRO, 0);
