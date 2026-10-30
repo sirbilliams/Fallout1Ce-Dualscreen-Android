@@ -1,3 +1,4 @@
+#include <cmath>
 #include "mui/mui_gameskin.h"
 
 #include <math.h>
@@ -1011,14 +1012,99 @@ namespace {
     }
 } // namespace
 
+namespace {
+    // Pip-Boy 2000 backdrop, all drawn (no game art): dark CRT glass, a faint
+    // grid and radar dial in dim phosphor green, scanlines, vignette, bezel.
+    // Static: nothing moves, so it is calm and identical in every autotest run.
+    void pipboyBackdrop(MuiContext& ui, const MuiRect& rect)
+    {
+        const MuiColor top = muiRgb(0x0E1F10);
+        const MuiColor bottom = muiRgb(0x060E08);
+        muiFillGradient(rect, top, top, bottom, bottom);
+
+        MuiColor dim = muiRgb(0x1F8C0D);
+        float cx = rect.centerX();
+        float cy = rect.y + rect.h * 0.52f;
+        float unit = std::min(rect.w, rect.h);
+        muiPushClip(rect);
+
+        // A soft glow of the glass behind the middle.
+        for (int i = 0; i < 14; i++) {
+            float r = unit * (0.62f - i * 0.04f);
+            muiFillCircle(cx, cy, r, muiRgb(0x39FF14, 2));
+        }
+
+        // The 8 px grid, drawn as 64 px cells with a fainter 16 px subdivision.
+        float cell = ui.dp(32.0f);
+        for (float x = rect.x + std::fmod(rect.w, cell) / 2.0f; x < rect.right(); x += cell) {
+            muiFillRect({ x, rect.y, 1.0f, rect.h }, dim.withAlpha(34));
+        }
+        for (float y = rect.y + std::fmod(rect.h, cell) / 2.0f; y < rect.bottom(); y += cell) {
+            muiFillRect({ rect.x, y, rect.w, 1.0f }, dim.withAlpha(34));
+        }
+
+        // Radar dial: rings, cross hairs and a tick scale.
+        constexpr float kPi = 3.14159265f;
+        auto ring = [&](float radius, float thickness, unsigned char alpha) {
+            std::vector<SDL_FPoint> points;
+            for (int i = 0; i < 96; i++) {
+                float a = 2.0f * kPi * i / 96.0f;
+                points.push_back({ cx + std::cos(a) * radius, cy + std::sin(a) * radius });
+            }
+            muiDrawPolyline(points, thickness, dim.withAlpha(alpha), true);
+        };
+        ring(unit * 0.16f, 1.5f, 70);
+        ring(unit * 0.28f, 1.5f, 60);
+        ring(unit * 0.40f, 1.5f, 50);
+        ring(unit * 0.52f, 2.0f, 90);
+        muiDrawLine(cx - unit * 0.56f, cy, cx + unit * 0.56f, cy, 1.5f, dim.withAlpha(52));
+        muiDrawLine(cx, cy - unit * 0.56f, cx, cy + unit * 0.56f, 1.5f, dim.withAlpha(52));
+        for (int i = 0; i < 72; i++) {
+            float a = 2.0f * kPi * i / 72.0f;
+            float inner = unit * (i % 6 == 0 ? 0.49f : 0.505f);
+            float outer = unit * 0.52f;
+            muiDrawLine(cx + std::cos(a) * inner, cy + std::sin(a) * inner, cx + std::cos(a) * outer, cy + std::sin(a) * outer, 1.5f, dim.withAlpha(i % 6 == 0 ? 110 : 60));
+        }
+
+        // Scanlines.
+        float line = std::max(ui.dp(3.0f), 3.0f);
+        for (float y = rect.y; y < rect.bottom(); y += line * 2.0f) {
+            muiFillRect({ rect.x, y, rect.w, line * 0.5f }, muiRgb(0x000000, 46));
+        }
+        muiPopClip();
+
+        // Vignette.
+        float edge = std::min(rect.w, rect.h) * 0.22f;
+        MuiColor shade = muiRgb(0x000000, 170);
+        MuiColor clear = shade.withAlpha(0);
+        muiFillGradient({ rect.x, rect.y, edge, rect.h }, shade, clear, clear, shade);
+        muiFillGradient({ rect.right() - edge, rect.y, edge, rect.h }, clear, shade, shade, clear);
+        muiFillGradient({ rect.x, rect.y, rect.w, edge }, shade, shade, clear, clear);
+        muiFillGradient({ rect.x, rect.bottom() - edge, rect.w, edge }, clear, clear, shade, shade);
+
+        // Thin bezel: dark outer frame and a dim phosphor edge inside it.
+        float bezel = ui.dp(6.0f);
+        MuiColor frame = muiRgb(0x1A2A1A);
+        muiFillRect({ rect.x, rect.y, rect.w, bezel }, frame);
+        muiFillRect({ rect.x, rect.bottom() - bezel, rect.w, bezel }, frame);
+        muiFillRect({ rect.x, rect.y, bezel, rect.h }, frame);
+        muiFillRect({ rect.right() - bezel, rect.y, bezel, rect.h }, frame);
+        MuiRect glass = rect.inset(bezel);
+        float edgeLine = 2.0f;
+        MuiColor glow = dim.withAlpha(150);
+        muiFillRect({ glass.x, glass.y, glass.w, edgeLine }, glow);
+        muiFillRect({ glass.x, glass.bottom() - edgeLine, glass.w, edgeLine }, glow);
+        muiFillRect({ glass.x, glass.y, edgeLine, glass.h }, glow);
+        muiFillRect({ glass.right() - edgeLine, glass.y, edgeLine, glass.h }, glow);
+    }
+} // namespace
+
 void muiGameBackdrop(MuiContext& ui, const MuiRect& rect)
 {
     const MuiTheme& theme = muiTheme();
     muiFillRect(rect, theme.background);
     if (muiSkinPipboy()) {
-        // The player's original Pip-Boy housing, behind the responsive console.
-        muiGameDrawArt(MuiArtGroup::Interface, "pip", rect);
-        muiFillRect(rect.inset(ui.dp(9)), muiRgb(0x101B13, 225));
+        pipboyBackdrop(ui, rect);
         return;
     }
     fillMetal(rect, muiRgb(0xE6DFD0), artScale(ui));
