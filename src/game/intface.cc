@@ -110,6 +110,7 @@ static void intface_draw_ammo_lights(int x, int ratio);
 static int intface_item_reload();
 static void intface_rotate_numbers(int x, int y, int previousValue, int value, int offset, int delay);
 static int intface_fatal_error(int rc);
+static void intface_create_fill(const unsigned char* barData);
 static int construct_box_bar_win();
 static void deconstruct_box_bar_win();
 static void reset_box_bar_win();
@@ -270,6 +271,10 @@ static IndicatorDescription bbox[INDICATOR_COUNT] = {
 // 0x50560C
 int interfaceWindow = -1;
 
+// CE: Wider than 640 px screens: a window behind the bar that fills the sides
+// with the bar's own edge art (its outer columns, mirrored back and forth).
+static int interfaceFillWindow = -1;
+
 // 0x505610
 int bar_window = -1;
 
@@ -422,6 +427,7 @@ int intface_init()
     }
 
     buf_to_buf(backgroundFrmData, INTERFACE_BAR_WIDTH, INTERFACE_BAR_HEIGHT, INTERFACE_BAR_WIDTH, interfaceBuffer, 640);
+    intface_create_fill(backgroundFrmData);
     art_ptr_unlock(backgroundFrmHandle);
 
     fid = art_id(OBJ_TYPE_INTERFACE, 47, 0, 0, 0);
@@ -687,6 +693,46 @@ int intface_init()
     return 0;
 }
 
+// Fills the sides of the bar on screens wider than 640 px. The art comes from
+// the game's own interface FRM at runtime (nothing shipped).
+static void intface_create_fill(const unsigned char* barData)
+{
+    int screenWidth = screenGetWidth();
+    if (screenWidth <= INTERFACE_BAR_WIDTH || interfaceFillWindow != -1) {
+        return;
+    }
+
+    int y = screenGetHeight() - INTERFACE_BAR_HEIGHT;
+    interfaceFillWindow = win_add(0, y, screenWidth, INTERFACE_BAR_HEIGHT, colorTable[0], WINDOW_HIDDEN);
+    if (interfaceFillWindow == -1) {
+        return;
+    }
+
+    unsigned char* buffer = win_get_buf(interfaceFillWindow);
+    if (buffer == NULL) {
+        win_delete(interfaceFillWindow);
+        interfaceFillWindow = -1;
+        return;
+    }
+
+    const int strip = 3;
+    int barX = (screenWidth - INTERFACE_BAR_WIDTH) / 2;
+    for (int row = 0; row < INTERFACE_BAR_HEIGHT; row++) {
+        const unsigned char* source = barData + row * INTERFACE_BAR_WIDTH;
+        unsigned char* dest = buffer + row * screenWidth;
+        for (int distance = 0; distance < barX; distance++) {
+            int phase = distance % (strip * 2);
+            int column = phase < strip ? phase : strip * 2 - 1 - phase;
+            dest[barX - 1 - distance] = source[column];
+        }
+        for (int distance = 0; distance < screenWidth - barX - INTERFACE_BAR_WIDTH; distance++) {
+            int phase = distance % (strip * 2);
+            int column = phase < strip ? phase : strip * 2 - 1 - phase;
+            dest[barX + INTERFACE_BAR_WIDTH + distance] = source[INTERFACE_BAR_WIDTH - 1 - column];
+        }
+    }
+}
+
 // 0x453D40
 void intface_reset()
 {
@@ -889,6 +935,11 @@ void intface_exit()
             inventoryButtonUp = NULL;
         }
 
+        if (interfaceFillWindow != -1) {
+            win_delete(interfaceFillWindow);
+            interfaceFillWindow = -1;
+        }
+
         if (interfaceWindow != -1) {
             win_delete(interfaceWindow);
             interfaceWindow = -1;
@@ -977,6 +1028,7 @@ void intface_hide()
     if (interfaceWindow != -1) {
         if (!intfaceHidden) {
             win_hide(interfaceWindow);
+            if (interfaceFillWindow != -1) win_hide(interfaceFillWindow);
             intfaceHidden = 1;
         }
     }
@@ -991,6 +1043,7 @@ void intface_show()
             intface_update_items(false);
             intface_update_hit_points(false);
             intface_update_ac(false);
+            if (interfaceFillWindow != -1) win_show(interfaceFillWindow);
             win_show(interfaceWindow);
             intfaceHidden = false;
         }
