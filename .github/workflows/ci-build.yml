@@ -100,12 +100,12 @@ jobs:
       - name: Build APK
         run: |
           cd os/android
-          timeout 900 ./gradlew --no-daemon assembleDebug
+          timeout 900 ./gradlew --no-daemon assembleRelease
 
       - name: Collect APK
         run: |
           mkdir -p out
-          cp os/android/app/build/outputs/apk/debug/app-debug.apk out/Fallout1-Dualscreen.apk
+          cp os/android/app/build/outputs/apk/release/app-release.apk out/Fallout1-Dualscreen.apk
           (cd out && sha256sum Fallout1-Dualscreen.apk > Fallout1-Dualscreen.apk.sha256)
           "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --verbose out/Fallout1-Dualscreen.apk
           ls -la out

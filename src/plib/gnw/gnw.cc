@@ -1319,6 +1319,7 @@ static int colorClose(void* handle)
 // 0x4C42B8
 bool GNWSystemError(const char* text)
 {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", text);
     SDL_Cursor* prev = SDL_GetCursor();
     SDL_Cursor* cursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
     SDL_SetCursor(cursor);

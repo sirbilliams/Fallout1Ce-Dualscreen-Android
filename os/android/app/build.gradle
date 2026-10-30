@@ -105,7 +105,7 @@ android {
         applicationId 'com.sirbilliams.fallout1ce.dualscreen'
         minSdk 24
         targetSdk 35
-        versionCode 3
+        versionCode 1000 + ((System.getenv('GITHUB_RUN_NUMBER') ?: '0') as int)
         versionName '1.0.0'
         externalNativeBuild {
             cmake {
@@ -164,7 +164,7 @@ android {
 
             // Release signing config is optional and might not be present in CI
             // builds, hence `findByName`.
-            signingConfig signingConfigs.findByName('release')
+            signingConfig signingConfigs.findByName('release') ?: signingConfigs.debug
         }
     }
 

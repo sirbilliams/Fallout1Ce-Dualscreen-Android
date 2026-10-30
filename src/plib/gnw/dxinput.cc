@@ -103,7 +103,11 @@ bool dxinput_read_keyboard_buffer(KeyboardData* keyboardData)
 // 0x4E070C
 bool dxinput_mouse_init()
 {
-    return SDL_SetRelativeMouseMode(SDL_TRUE) == 0;
+    if (SDL_SetRelativeMouseMode(SDL_TRUE) == 0) return true;
+    SDL_Log("Relative mouse unavailable: %s", SDL_GetError());
+    const char* driver = SDL_GetCurrentVideoDriver();
+    // Offscreen smoke has no physical pointer to capture.
+    return driver != nullptr && SDL_strcmp(driver, "offscreen") == 0;
 }
 
 // 0x4E078C

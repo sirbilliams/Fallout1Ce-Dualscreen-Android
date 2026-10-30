@@ -228,6 +228,7 @@ void handleWindowSizeChanged()
 
 void renderPresent()
 {
+    if (gSdlTexture == nullptr || gSdlTextureSurface == nullptr || gSdlRenderer == nullptr) return;
     SDL_UpdateTexture(gSdlTexture, NULL, gSdlTextureSurface->pixels, gSdlTextureSurface->pitch);
     SDL_RenderClear(gSdlRenderer);
     SDL_RenderCopy(gSdlRenderer, gSdlTexture, NULL, NULL);

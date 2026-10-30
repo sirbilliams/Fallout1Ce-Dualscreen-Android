@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "audio_engine.h"
+#include "mobile_contracts.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
@@ -15,7 +16,6 @@
 #include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
 #include "plib/gnw/touch.h"
-#include "mobile_contracts.h"
 #include "plib/gnw/vcr.h"
 #include "plib/gnw/winmain.h"
 
@@ -1112,6 +1112,9 @@ void GNW95_process_message()
                 keyboardData.down = (e.key.state & SDL_PRESSED) != 0;
                 GNW95_process_key(&keyboardData);
             }
+            break;
+        case SDL_RENDER_DEVICE_RESET:
+            handleWindowSizeChanged();
             break;
         case SDL_WINDOWEVENT:
             switch (e.window.event) {
