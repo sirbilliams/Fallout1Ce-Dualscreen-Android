@@ -1,5 +1,9 @@
 #include "main.h"
 
+#include "bottom_screen.h"
+#include "mobile_contracts.h"
+#include <cstdlib>
+
 // NOTE: Actual file name is unknown. Functions in this module do not present
 // in debug symbols from `mapper2.exe`. In OS X binary these functions appear
 // very far from the ones found in `mainmenu.c`, implying they are in separate
@@ -96,8 +100,14 @@ int gnw_main(int argc, char** argv)
         return 1;
     }
 
-    gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
-    gmovie_play(MOVIE_INTRO, 0);
+    bool devAutotest = false;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--dev-autotest") == 0) devAutotest = true;
+    }
+    if (!devAutotest) {
+        gmovie_play(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
+        gmovie_play(MOVIE_INTRO, 0);
+    }
 
     if (main_menu_create() == 0) {
         int language_filter = 1;
@@ -111,7 +121,49 @@ int gnw_main(int argc, char** argv)
             main_menu_show(1);
 
             mouse_show();
-            int mainMenuRc = main_menu_loop();
+            int mainMenuRc;
+            if (devAutotest) {
+#ifndef __ANDROID__
+                MobileSnapshot testSnapshot;
+                testSnapshot.generation = 1;
+                mobilePublishSnapshot(testSnapshot);
+                MobileCommand command;
+                command.generation = 1;
+                for (int i = 0; i < 64; ++i) {
+                    command.id = i;
+                    if (!mobileQueueCommand(command)) std::exit(2);
+                }
+                if (mobileQueueCommand(command)) std::exit(2);
+                for (int i = 0; i < 64; ++i) {
+                    if (!mobileTakeCommand(&command) || command.id != i) std::exit(2);
+                }
+                mobileQueueCommand(command);
+                testSnapshot.generation = 2;
+                mobilePublishSnapshot(testSnapshot);
+                if (mobileTakeCommand(&command) || mobileQueueCommand(command)) std::exit(2);
+                bottomScreenSetTest(640, 480, 1.0f);
+                mobileRenderBottom();
+                if (!bottomScreenAvailable() || bottomScreenTestFrame() == nullptr) std::exit(2);
+                bottomScreenSetTest(0, 0, 1.0f);
+                if (bottomScreenAvailable() || bottomScreenTestFrame() != nullptr) std::exit(2);
+                mobileRenderBottom();
+                bottomScreenSetTest(480, 640, 1.0f);
+                mobileRenderBottom();
+                if (bottomScreenTestFrame() == nullptr) std::exit(2);
+                bottomScreenSetTest(0, 0, 1.0f);
+                mobilePublishSnapshot(MobileSnapshot {});
+#endif
+                renderPresent();
+                const char* capture = std::getenv("FALLOUT_AUTOTEST_BMP");
+                if (capture == nullptr || SDL_SaveBMP(gSdlTextureSurface, capture) != 0) {
+                    SDL_Log("main-menu capture failed: %s", SDL_GetError());
+                    std::exit(2);
+                }
+                SDL_Log("dev-autotest: main menu captured");
+                mainMenuRc = MAIN_MENU_EXIT;
+            } else {
+                mainMenuRc = main_menu_loop();
+            }
             mouse_hide();
 
             switch (mainMenuRc) {
