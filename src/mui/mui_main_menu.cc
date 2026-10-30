@@ -63,7 +63,7 @@ namespace {
             getverstr(engine, sizeof(engine));
             std::string port = muiPortVersion();
             size_t space = port.find(' ');
-            std::u32string lines[] = { muiDecodeGameText(engine), U"Dual screen", U"Port " + muiDecodeUtf8(port.substr(0, space).c_str()), space == std::string::npos ? U"" : muiDecodeUtf8(port.substr(space + 1).c_str()), U"Touch a button", U"to begin" };
+            std::u32string lines[] = { muiDecodeGameText(engine), U"Dual screen", U"Port " + muiDecodeUtf8(port.substr(0, space).c_str()), space == std::string::npos ? U"" : muiDecodeUtf8(port.substr(space + 1).c_str()), U"Pick one", U"to begin" };
             float lineHeight = text.h / 6.0f;
             for (int index = 0; index < 6; index++) {
                 MuiRect line = { text.x, text.y + lineHeight * index, text.w, lineHeight };

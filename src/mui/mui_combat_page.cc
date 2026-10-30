@@ -397,6 +397,13 @@ namespace {
             MuiRect rect = { grid.x + column * (width + gap), grid.y + line * (height + gap), width, height };
             const char* name = combat_get_loc_name(chosen->critter, parts[index]);
             std::u32string label = name != nullptr ? muiDecodeGameText(name) : u("?");
+            // "the left paw" -> "Left paw".
+            if (label.compare(0, 4, U"the ") == 0) {
+                label.erase(0, 4);
+            }
+            if (!label.empty() && label[0] >= U'a' && label[0] <= U'z') {
+                label[0] = label[0] - U'a' + U'A';
+            }
             int chance = chanceFor(chosen->critter, aimed, parts[index]);
             bool enabled = chance >= 0;
             std::string id = "combat.part." + std::to_string(index);

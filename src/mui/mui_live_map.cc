@@ -102,7 +102,7 @@ namespace {
     Palette palette()
     {
         if (muiSkinPipboy()) {
-            return { muiRgb(0x39FF14), muiRgb(0xBFFF00), muiRgb(0x7FFF00), muiRgb(0x1F8C0D), muiRgb(0xB8FF3C), muiRgb(0xE8FF99), muiRgb(0xE8FF99), muiRgb(0x39FF14), muiRgb(0x1F8C0D), muiRgb(0xFFFFFF) };
+            return { muiRgb(0x39FF14), muiRgb(0xBFFF00), muiRgb(0x7FFF00), muiRgb(0x1F8C0D), muiRgb(0xB8FF3C), muiRgb(0xE8FF99), muiRgb(0xFF7A3C), muiRgb(0x39FF14), muiRgb(0x1F8C0D), muiRgb(0xFFFFFF) };
         }
         return { muiRgb(0x56C85A), muiRgb(0xD8B060), muiRgb(0xE0C060), muiRgb(0x6AB0F0), muiRgb(0xFFD060), muiRgb(0xFFB000), muiRgb(0xFF6A4A), muiRgb(0x60FF60), muiRgb(0x8C704A), muiRgb(0xFFFFFF) };
     }
