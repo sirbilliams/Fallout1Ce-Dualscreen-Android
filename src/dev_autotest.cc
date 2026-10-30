@@ -35,8 +35,10 @@
 #include "mui/mui_settings.h"
 #include "platform_compat.h"
 #include "plib/gnw/input.h"
+#include "plib/gnw/kb.h"
 #include "plib/gnw/mouse.h"
 #include "plib/gnw/mouse_ctl.h"
+#include "plib/gnw/pad_actions.h"
 #include "plib/gnw/svga.h"
 
 namespace fallout {
@@ -620,8 +622,68 @@ namespace {
         SDL_Log("autotest-mouse: t=%u %-28s cursor=(%d,%d) L=%d R=%d leftHeld=%d", compat_ticks(), what, x, y, gMouseL, gMouseR, gMouseLeftDown);
     }
 
+    bool padKeyboardTest()
+    {
+        kb_clear();
+        SDL_Event event = {};
+        event.type = SDL_CONTROLLERBUTTONDOWN;
+        event.cbutton.which = -999;
+        event.cbutton.button = SDL_CONTROLLER_BUTTON_X;
+        SDL_PushEvent(&event);
+        SDL_PushEvent(&event); // A repeated down must not post another shortcut.
+        event.type = SDL_CONTROLLERBUTTONUP;
+        SDL_PushEvent(&event);
+        GNW95_process_message();
+        GNW95_process_message();
+        if (kb_getch() != KEY_LOWERCASE_S || kb_getch() != -1) return false;
+        event = {};
+        event.type = SDL_CONTROLLERAXISMOTION;
+        event.caxis.which = -999;
+        event.caxis.axis = SDL_CONTROLLER_AXIS_TRIGGERLEFT;
+        event.caxis.value = 20000;
+        SDL_PushEvent(&event);
+        event.caxis.value = 24000;
+        SDL_PushEvent(&event); // Still held above half travel.
+        event.caxis.value = 0;
+        SDL_PushEvent(&event);
+        event.caxis.value = 20000;
+        SDL_PushEvent(&event); // Released then pressed again.
+        event.caxis.value = 0;
+        SDL_PushEvent(&event);
+        GNW95_process_message();
+        GNW95_process_message();
+        if (kb_getch() != KEY_LOWERCASE_B || kb_getch() != KEY_LOWERCASE_B || kb_getch() != -1) return false;
+        kb_disable();
+        event = {};
+        event.type = SDL_CONTROLLERBUTTONDOWN;
+        event.cbutton.which = -999;
+        event.cbutton.button = SDL_CONTROLLER_BUTTON_X;
+        SDL_PushEvent(&event);
+        event.type = SDL_CONTROLLERBUTTONUP;
+        SDL_PushEvent(&event);
+        GNW95_process_message();
+        GNW95_process_message();
+        kb_enable();
+        if (kb_getch() != -1) return false;
+        SDL_Log("autotest-pad: native keyboard queue, trigger rearm, disabled input PASS");
+        return true;
+    }
+
     bool mouseScenes(const char* dir, int width, int height)
     {
+        int bindings[kPadButtonCount];
+        int restored[kPadButtonCount];
+        padParseBindings("A=none; rs=inventory bogus=click,x=bad y=context a=click lt=NONE", bindings);
+        std::string overrides = padSerializeBindings(bindings);
+        if (overrides != "y=context,rs=inventory,lt=none") return false;
+        padParseBindings(overrides, restored);
+        for (int b = 0; b < kPadButtonCount; b++)
+            if (bindings[b] != restored[b]) return false;
+        padParseBindings("", bindings);
+        if (!padSerializeBindings(bindings).empty()) return false;
+        SDL_Log("autotest-pad: override round trip PASS");
+        if (!padKeyboardTest()) return false;
+        if (padActionsUpdate(1u << 0) != 1 || padActionsUpdate(1u << 1) != 2 || padActionsUpdate(1u << 9) != 4) return false;
         gMouseDir = dir;
         gConsoleWidth = width;
         gConsoleHeight = height;
@@ -787,6 +849,38 @@ namespace {
         mouseFinger(true, SDL_FINGERUP, 7, bx, by);
         mouseFrame(30);
         mouseShot("68-controls");
+        std::string originalBindings = settings.touch.pad_bindings;
+        int originalTheme = settings.touch.bottom_theme;
+        for (int i = 0; i < 6; i++)
+            muiOptionsPadButton(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        mouseFrame(3);
+        mouseShot("69-controls-pad-focus");
+        int oldBinding = padBinding(1);
+        muiOptionsPadButton(SDL_CONTROLLER_BUTTON_A);
+        mouseFrame(3);
+        if (padBinding(1) != (oldBinding + 1) % padActionCount()) return false;
+        // Touch the same visible row and verify it cycles, too.
+        if (!muiGetWidgetCenter("controls.binding.1", &bx, &by, &onBottom)) return false;
+        mouseFinger(onBottom, SDL_FINGERDOWN, 7, bx, by);
+        mouseFrame(3);
+        mouseFinger(onBottom, SDL_FINGERUP, 7, bx, by);
+        mouseFrame(3);
+        if (padBinding(1) != (oldBinding + 2) % padActionCount()) return false;
+        muiSettingsSetTheme(0, false);
+        mouseFrame(10);
+        mouseShot("70-controls-classic");
+        // Navigate to Reset; focus follows the row through the scroll area.
+        for (int i = 0; i < 15; i++)
+            muiOptionsPadButton(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        mouseFrame(3);
+        mouseShot("71-controls-reset");
+        muiOptionsPadButton(SDL_CONTROLLER_BUTTON_A);
+        mouseFrame(3);
+        if (!settings.touch.pad_bindings.empty()) return false;
+        settings.touch.pad_bindings = originalBindings;
+        muiSettingsSetMouse();
+        muiSettingsSetTheme(originalTheme, false);
+        SDL_Log("autotest-pad: touch, pad focus, reset PASS");
         muiOptionsHide();
         mouseFrame(10);
         return true;

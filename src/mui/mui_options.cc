@@ -3,6 +3,8 @@
 #include "mui/mui_screens.h"
 #include "mui/mui_settings.h"
 
+#include "plib/gnw/pad_actions.h"
+#include <SDL.h>
 #include <algorithm>
 #include <stdio.h>
 
@@ -93,21 +95,36 @@ namespace {
             float gap = ui.dp(10.0f);
             float width = std::min(content.w, ui.dp(520.0f));
             float x = content.centerX() - width / 2.0f;
-            float rowHeight = std::min(ui.dp(60.0f), (content.h - gap * 6.0f) / 5.0f);
-            float y = content.y + gap;
+            float rowHeight = ui.dp(60.0f);
+            float stride = rowHeight + gap;
+            if (padMoved) {
+                ui.setScroll("controls", std::max(0.0f, padFocus * stride - content.h / 2));
+                padMoved = false;
+            }
+            float offset = ui.scroll("controls", content, 22 * stride + gap);
+            float y = content.y + gap - offset;
+            muiPushClip(content);
             bool changed = false;
             bool anyHeld = false;
+            int rowIndex = 0;
 
             auto toggleRow = [&](const char* id, const char* label, bool* value) {
                 MuiRect row = { x, y, width, rowHeight };
+                if (rowIndex == padFocus) muiFillRect(row, muiTheme().selected);
                 muiDrawTextAligned(muiDecodeUtf8(label), { row.x, row.y, row.w - ui.dp(96.0f), row.h }, ui.dp(14.0f), muiTheme().text, MuiAlign::Start, MuiAlign::Center);
-                if (ui.toggle(id, { row.right() - ui.dp(88.0f), row.y, ui.dp(88.0f), row.h }, value)) {
+                if (padActivate && rowIndex == padFocus) {
+                    *value = !*value;
+                    changed = true;
+                }
+                rowIndex++;
+                if (row.y >= content.y && row.bottom() <= content.bottom() && ui.toggle(id, { row.right() - ui.dp(88.0f), row.y, ui.dp(88.0f), row.h }, value)) {
                     changed = true;
                 }
                 y += rowHeight + gap;
             };
             auto sliderRow = [&](const char* id, const char* label, int* value, int low, int high, int step, const char* offText) {
                 MuiRect row = { x, y, width, rowHeight };
+                if (rowIndex == padFocus) muiFillRect(row, muiTheme().selected);
                 char text[64];
                 if (offText != nullptr && *value <= low + 50) {
                     snprintf(text, sizeof(text), "%s: %s", label, offText);
@@ -115,9 +132,15 @@ namespace {
                     snprintf(text, sizeof(text), "%s: %d", label, *value);
                 }
                 muiDrawTextAligned(muiDecodeUtf8(text), { row.x, row.y, row.w, row.h * 0.5f }, ui.dp(13.0f), muiTheme().text, MuiAlign::Start, MuiAlign::Center);
+                if (padActivate && rowIndex == padFocus) {
+                    *value = std::clamp(*value + step * padDelta, low, high);
+                    changed = true;
+                }
+                rowIndex++;
                 float current = static_cast<float>(*value);
                 bool held = false;
-                float next = ui.slider(id, { row.x, row.y + row.h * 0.62f, row.w, row.h * 0.3f }, current, static_cast<float>(low), static_cast<float>(high), &held);
+                float next = current;
+                if (row.y >= content.y && row.bottom() <= content.bottom()) next = ui.slider(id, { row.x, row.y + row.h * 0.62f, row.w, row.h * 0.3f }, current, static_cast<float>(low), static_cast<float>(high), &held);
                 anyHeld = anyHeld || held;
                 int stepped = static_cast<int>(next / step + (next >= 0 ? 0.5f : -0.5f)) * step;
                 if (stepped < low) stepped = low;
@@ -142,6 +165,26 @@ namespace {
                 t.touch_hold_ms = hold < 300 ? 0 : hold;
             }
 
+            for (int b = 0; b <= kPadButtonCount; b++) {
+                std::string id = "controls.binding." + std::to_string(b);
+                std::string label = b == kPadButtonCount ? "RESET PAD TO DEFAULTS" : std::string(padButtonName(b)) + ": " + padActionName(padBinding(b));
+                MuiRect row = { x, y, width, rowHeight };
+                bool visible = row.y >= content.y && row.bottom() <= content.bottom();
+                bool activated = false;
+                if (visible) activated = ui.button(id, row, muiDecodeUtf8(label.c_str()), padFocus == b + 5 ? MuiButtonStyle::Primary : MuiButtonStyle::Normal);
+                if (visible && padFocus == b + 5) muiStrokeRoundRect(row.inset(ui.dp(2.0f)), ui.dp(4.0f), ui.dp(2.0f), muiTheme().accent);
+                if (activated || (padActivate && padFocus == b + 5)) {
+                    if (b == kPadButtonCount)
+                        padResetBindings();
+                    else
+                        padSetBinding(b, (padBinding(b) + padDelta + padActionCount()) % padActionCount());
+                }
+                y += stride;
+            }
+            padActivate = false;
+            padDelta = 1;
+            muiPopClip();
+
             // Sliders save when the finger lets go, not on every step.
             if (changed) {
                 dirty = true;
@@ -153,6 +196,10 @@ namespace {
             }
         }
 
+        int padFocus = 0;
+        int padDelta = 1;
+        bool padMoved = false;
+        bool padActivate = false;
         bool controls = false;
         bool dirty = false;
         int choice = -1;
@@ -161,6 +208,26 @@ namespace {
     OptionsScreen* gOptionsScreen = nullptr;
 
 } // namespace
+
+bool muiOptionsPadActive() { return gOptionsScreen != nullptr; }
+
+bool muiOptionsPadButton(int button)
+{
+    if (gOptionsScreen == nullptr) return false;
+    auto& screen = *gOptionsScreen;
+    if (button == SDL_CONTROLLER_BUTTON_B || button == SDL_CONTROLLER_BUTTON_START)
+        screen.back();
+    else if (!screen.controls) {
+        if (button == SDL_CONTROLLER_BUTTON_A) screen.controls = true;
+    } else if (button == SDL_CONTROLLER_BUTTON_DPAD_UP || button == SDL_CONTROLLER_BUTTON_DPAD_DOWN) {
+        screen.padFocus = (screen.padFocus + (button == SDL_CONTROLLER_BUTTON_DPAD_UP ? 21 : 1)) % 22;
+        screen.padMoved = true;
+    } else if (button == SDL_CONTROLLER_BUTTON_A || button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT || button == SDL_CONTROLLER_BUTTON_DPAD_LEFT) {
+        screen.padActivate = true;
+        screen.padDelta = button == SDL_CONTROLLER_BUTTON_DPAD_LEFT ? -1 : 1;
+    }
+    return true;
+}
 
 void muiOptionsShow()
 {

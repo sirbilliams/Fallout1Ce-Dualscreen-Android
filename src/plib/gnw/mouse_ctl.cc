@@ -7,9 +7,11 @@
 #include <deque>
 #include <vector>
 
+#include "mui/mui.h"
 #include "mui/mui_settings.h"
 #include "platform_compat.h"
 #include "plib/gnw/mouse.h"
+#include "plib/gnw/pad_actions.h"
 #include "plib/gnw/svga.h"
 
 namespace fallout {
@@ -141,18 +143,21 @@ namespace {
         return value;
     }
 
-    // Held buttons of all controllers: 1 A, 2 B, 4 R3.
+    // Aggregate controllers, then resolve bindings to held mouse buttons.
     int padButtons()
     {
         if (gTestPad) {
             return gTestButtons;
         }
-        int mask = 0;
+        unsigned int physical = 0;
+        const SDL_GameControllerButton buttons[] = { SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, SDL_CONTROLLER_BUTTON_LEFTSTICK, SDL_CONTROLLER_BUTTON_RIGHTSTICK, SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT };
         for (SDL_GameController* pad : gPads) {
-            if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_A)) mask |= 1;
-            if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_B)) mask |= 2;
-            if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_RIGHTSTICK)) mask |= 4;
+            for (int b = 0; b < 14; b++)
+                if (SDL_GameControllerGetButton(pad, buttons[b])) physical |= 1u << b;
+            if (SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 16384) physical |= 1u << 14;
+            if (SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 16384) physical |= 1u << 15;
         }
+        int mask = padActionsUpdate(physical);
         return mask;
     }
 
@@ -381,10 +386,11 @@ bool mouseCtlUpdate(MouseCtlOut* out)
     moveY += gPadY;
     gPadX = gPadY = 0.0f;
 
-    // Controller.
-    if (config.pad_cursor) {
-        float rx = gTestPad ? gTestX : rawAxis(SDL_CONTROLLER_AXIS_RIGHTX);
-        float ry = gTestPad ? gTestY : rawAxis(SDL_CONTROLLER_AXIS_RIGHTY);
+    // Buttons remain usable when stick movement is disabled.
+    int buttons = padButtons();
+    {
+        float rx = !config.pad_cursor ? 0.0f : (gTestPad ? gTestX : rawAxis(SDL_CONTROLLER_AXIS_RIGHTX));
+        float ry = !config.pad_cursor ? 0.0f : (gTestPad ? gTestY : rawAxis(SDL_CONTROLLER_AXIS_RIGHTY));
         float sx = stickCurve(rx);
         float sy = stickCurve(ry);
         if (sx == 0.0f && sy == 0.0f) {
@@ -401,9 +407,10 @@ bool mouseCtlUpdate(MouseCtlOut* out)
             moveY += iy;
         }
 
-        int buttons = padButtons();
         if (buttons & 1) held |= kLeft;
         if (buttons & 2) held |= kRight;
+        // Giving the options UI the pad cancels an unfinished gesture.
+        if (muiOptionsPadActive()) gR3Down = false;
         bool r3 = (buttons & 4) != 0;
         if (r3 && !gR3Down) {
             gR3Down = true;
@@ -422,8 +429,6 @@ bool mouseCtlUpdate(MouseCtlOut* out)
                 gPulses.push_back(kLeft);
             }
         }
-    } else {
-        gR3Down = false;
     }
 
     // One click at a time, with a call in between where the button is up.
@@ -438,7 +443,7 @@ bool mouseCtlUpdate(MouseCtlOut* out)
 
     int dx = static_cast<int>(moveX);
     int dy = static_cast<int>(moveY);
-    int buttons = held | pulse;
+    buttons = held | pulse;
     int wheelX = gWheelX;
     int wheelY = gWheelY;
     gWheelX = gWheelY = 0;

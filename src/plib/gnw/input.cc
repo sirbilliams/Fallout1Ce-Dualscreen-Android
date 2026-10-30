@@ -16,6 +16,7 @@
 #include "plib/gnw/intrface.h"
 #include "plib/gnw/memory.h"
 #include "plib/gnw/mouse_ctl.h"
+#include "plib/gnw/pad_actions.h"
 #include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
 #include "plib/gnw/touch.h"
@@ -1136,9 +1137,17 @@ void GNW95_process_message()
                 GNW95_process_key(&keyboardData);
             }
             break;
+        case SDL_CONTROLLERBUTTONDOWN:
+            muiOptionsPadButton(e.cbutton.button);
+            [[fallthrough]];
+        case SDL_CONTROLLERBUTTONUP:
+        case SDL_CONTROLLERAXISMOTION:
+            padActionsHandleEvent(&e);
+            break;
         case SDL_CONTROLLERDEVICEADDED:
         case SDL_CONTROLLERDEVICEREMOVED:
             mouseCtlHandleEvent(&e);
+            padActionsHandleEvent(&e);
             break;
         case SDL_RENDER_DEVICE_RESET:
             handleWindowSizeChanged();

@@ -172,3 +172,5 @@ Here is a couple of current goals. Open up an issue if you have suggestion or fe
 ## License
 
 The source code is this repository is available under the [Sustainable Use License](LICENSE.md).
+
+Controller defaults and OPTIONS > CONTROLS remapping: [controls guide](docs/controls.md).

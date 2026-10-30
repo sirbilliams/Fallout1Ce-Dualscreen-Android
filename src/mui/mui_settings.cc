@@ -2,6 +2,7 @@
 
 #include "game/config.h"
 #include "game/gconfig.h"
+#include "plib/gnw/pad_actions.h"
 
 namespace fallout {
 
@@ -23,6 +24,8 @@ void muiSettingsRefresh()
     if (config_get_value(&game_config, "touch", "bottom_screen", &value)) t.dual_screen = value != 0;
     t.direct_touch = !(config_get_value(&game_config, "touch", "direct_touch", &value) && value == 0);
     t.pad_cursor = !(config_get_value(&game_config, "touch", "pad_cursor", &value) && value == 0);
+    char* bindings = nullptr;
+    t.pad_bindings = config_get_string(&game_config, "touch", "pad_bindings", &bindings) ? bindings : "";
     t.cursor_speed = 100;
     if (config_get_value(&game_config, "touch", "cursor_speed", &value) && value >= 50 && value <= 200) t.cursor_speed = value;
     t.long_press_ms = 400;
@@ -33,7 +36,11 @@ void muiSettingsRefresh()
 
 void muiSettingsSetMouse(bool persist)
 {
+    int bindings[kPadButtonCount];
+    padParseBindings(settings.touch.pad_bindings, bindings);
+    settings.touch.pad_bindings = padSerializeBindings(bindings);
     const MuiTouchSettings& t = settings.touch;
+    config_set_string(&game_config, "touch", "pad_bindings", t.pad_bindings.c_str());
     config_set_value(&game_config, "touch", "direct_touch", t.direct_touch ? 1 : 0);
     config_set_value(&game_config, "touch", "pad_cursor", t.pad_cursor ? 1 : 0);
     config_set_value(&game_config, "touch", "cursor_speed", t.cursor_speed);

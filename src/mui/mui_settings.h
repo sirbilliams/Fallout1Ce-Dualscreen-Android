@@ -1,6 +1,8 @@
 #ifndef FALLOUT_MUI_SETTINGS_H_
 #define FALLOUT_MUI_SETTINGS_H_
 
+#include <string>
+
 namespace fallout {
 
 // Presentation settings of the mobile UI, read from fallout.cfg [touch]
@@ -21,6 +23,7 @@ struct MuiTouchSettings {
     // held still on the top screen = right click) 300..1500, 0 = off.
     bool direct_touch = true;
     bool pad_cursor = true;
+    std::string pad_bindings;
     int cursor_speed = 100;
     int long_press_ms = 400;
     int touch_hold_ms = 600;
