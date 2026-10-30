@@ -22,15 +22,14 @@ float bottomScreenGetDensity();
 // is gone or of another size (a frame of the new size comes next).
 void bottomScreenPostFrame(const unsigned char* pixels, int width, int height, int pitch);
 
-#ifndef __ANDROID__
-// Desktop builds (bottom_screen_desktop.cc): no second screen unless a test
-// makes one of [width] x [height] at [density]; 0 x 0 takes it away.
+// Test hooks (dev_autotest.cc; desktop backend bottom_screen_desktop.cc): no
+// second screen unless a test makes one of [width] x [height] at [density];
+// 0 x 0 takes it away. No-ops on Android, which has the real screen.
 void bottomScreenSetTest(int width, int height, float density);
 
 // The last frame posted to the test screen (R, G, B, A rows, its width * 4
 // bytes apart), empty before any.
 const unsigned char* bottomScreenTestFrame();
-#endif
 
 } // namespace fallout
 

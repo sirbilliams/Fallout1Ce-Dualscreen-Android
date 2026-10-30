@@ -86,6 +86,15 @@ void bottomScreenPostFrame(const unsigned char* pixels, int width, int height, i
     ANativeWindow_unlockAndPost(gWindow);
 }
 
+void bottomScreenSetTest(int, int, float)
+{
+}
+
+const unsigned char* bottomScreenTestFrame()
+{
+    return nullptr;
+}
+
 } // namespace fallout
 
 extern "C" JNIEXPORT void JNICALL Java_com_alexbatalov_falloutce_BottomScreen_nativeSurfaceChanged(JNIEnv* env, jclass, jobject surface, jint width, jint height, jfloat density)
