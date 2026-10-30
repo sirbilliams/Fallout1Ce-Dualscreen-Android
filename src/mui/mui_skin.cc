@@ -1,5 +1,6 @@
 #include "mui/mui_skin.h"
 #include "mui/mui_gameskin.h"
+#include "platform_compat.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -226,7 +227,7 @@ void muiSkinWell(MuiContext& ui, const MuiRect& rect)
     if (rect.w >= ui.dp(80.0f) && rect.h >= ui.dp(60.0f)) {
         muiPushClip(rect);
 
-        float phase = static_cast<float>(SDL_GetTicks() % kRollMs) / kRollMs;
+        float phase = static_cast<float>(compat_ticks() % kRollMs) / kRollMs;
         float band = ui.dp(46.0f);
         float bandY = rect.y - band + (rect.h + band * 2.0f) * phase;
         MuiColor roll = theme.text.withAlpha(16);

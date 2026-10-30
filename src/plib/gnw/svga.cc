@@ -1,6 +1,7 @@
 #include "plib/gnw/svga.h"
 #include "mobile_contracts.h"
 #include "mui/mui.h"
+#include "platform_compat.h"
 
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
@@ -258,6 +259,7 @@ void handleWindowSizeChanged()
 void renderPresent()
 {
     if (gSdlTexture == nullptr || gSdlTextureSurface == nullptr || gSdlRenderer == nullptr) return;
+    compat_frame();
     SDL_UpdateTexture(gSdlTexture, NULL, gSdlTextureSurface->pixels, gSdlTextureSurface->pitch);
     SDL_RenderClear(gSdlRenderer);
     SDL_RenderCopy(gSdlRenderer, gSdlTexture, NULL, NULL);

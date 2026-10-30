@@ -34,6 +34,16 @@ long compat_tell(int fileHandle);
 long compat_filelength(int fd);
 int compat_mkdir(const char* path);
 unsigned int compat_timeGetTime();
+
+// UI/animation clock (see platform_compat.cc): SDL_GetTicks, or a per-frame
+// fixed clock under --dev-autotest.
+unsigned int compat_ticks();
+void compat_setFixedClock(bool enabled);
+bool compat_fixedClock();
+void compat_frame();
+void compat_setFrameHook(void (*hook)());
+void compat_advanceClock(unsigned int ms);
+unsigned int compat_eventTime(unsigned int realTimestamp);
 FILE* compat_fopen(const char* path, const char* mode);
 int compat_remove(const char* path);
 int compat_rename(const char* oldFileName, const char* newFileName);

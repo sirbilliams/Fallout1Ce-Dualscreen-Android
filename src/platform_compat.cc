@@ -229,6 +229,60 @@ int compat_mkdir(const char* path)
 #endif
 }
 
+// CE: UI/animation clock. SDL_GetTicks normally; under --dev-autotest a fixed
+// clock that only moves when a frame is presented (or a wait is skipped), so
+// two runs are bit-identical.
+static bool gFixedClock = false;
+static unsigned int gFixedClockMs = 0;
+
+void compat_setFixedClock(bool enabled)
+{
+    gFixedClock = enabled;
+}
+
+bool compat_fixedClock()
+{
+    return gFixedClock;
+}
+
+void compat_advanceClock(unsigned int ms)
+{
+    gFixedClockMs += ms;
+}
+
+static void (*gFrameHook)() = nullptr;
+
+void compat_setFrameHook(void (*hook)())
+{
+    gFrameHook = hook;
+}
+
+// Called once per presented frame: moves the fixed clock by 16 ms.
+void compat_frame()
+{
+    if (!gFixedClock) {
+        return;
+    }
+    gFixedClockMs += 16;
+    if (gFrameHook != nullptr) {
+        gFrameHook();
+    }
+}
+
+unsigned int compat_ticks()
+{
+    if (gFixedClock) {
+        // One ms per read so a loop that only polls the clock still ends.
+        return gFixedClockMs++;
+    }
+    return SDL_GetTicks();
+}
+
+unsigned int compat_eventTime(unsigned int realTimestamp)
+{
+    return gFixedClock ? gFixedClockMs : realTimestamp;
+}
+
 unsigned int compat_timeGetTime()
 {
 #ifdef _WIN32

@@ -5,6 +5,7 @@
 
 #include <string.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -28,12 +29,47 @@
 #include "mui/mui.h"
 #include "mui/mui_screens.h"
 #include "mui/mui_settings.h"
+#include "platform_compat.h"
 #include "plib/gnw/input.h"
 #include "plib/gnw/svga.h"
 
 namespace fallout {
 
 namespace {
+
+    // Timers that run on frames: with the fixed autotest clock the capture and
+    // key presses of the classic screens must land on the same frame every run
+    // (SDL timers fire on wall time).
+    struct Scheduled {
+        unsigned long frame;
+        Uint32 (*callback)(Uint32, void*);
+    };
+    std::vector<Scheduled> gScheduled;
+    unsigned long gFrameNumber = 0;
+
+    void frameHook()
+    {
+        gFrameNumber++;
+        for (size_t i = 0; i < gScheduled.size();) {
+            if (gScheduled[i].frame > gFrameNumber) {
+                i++;
+                continue;
+            }
+            Scheduled item = gScheduled[i];
+            Uint32 next = item.callback(0, nullptr);
+            if (next == 0) {
+                gScheduled.erase(gScheduled.begin() + i);
+            } else {
+                gScheduled[i].frame = gFrameNumber + std::max<Uint32>(1, next / 16);
+                i++;
+            }
+        }
+    }
+
+    void schedule(Uint32 delayMs, Uint32 (*callback)(Uint32, void*))
+    {
+        gScheduled.push_back({ gFrameNumber + std::max<Uint32>(1, delayMs / 16), callback });
+    }
 
     bool saveRgba(const unsigned char* pixels, int width, int height, const std::string& path)
     {
@@ -92,7 +128,6 @@ namespace {
         for (int i = 0; i < 4; i++) {
             get_input();
             renderPresent();
-            SDL_Delay(16);
         }
         event.type = SDL_FINGERUP;
         event.tfinger.pressure = 0.0f;
@@ -100,7 +135,6 @@ namespace {
         for (int i = 0; i < 6; i++) {
             get_input();
             renderPresent();
-            SDL_Delay(16);
         }
     }
 
@@ -110,7 +144,6 @@ namespace {
         for (int i = 0; i < count; i++) {
             get_input();
             renderPresent();
-            SDL_Delay(16);
         }
     }
 
@@ -169,7 +202,7 @@ namespace {
         gClassicPath = std::string(dir) + "/" + name + "-top.bmp";
         gClassicStep = 0;
         SDL_InitSubSystem(SDL_INIT_TIMER);
-        SDL_AddTimer(delayMs, classicTimer, nullptr);
+        schedule(delayMs, classicTimer);
     }
 
     std::string gLiveDir;
@@ -233,6 +266,8 @@ void devAutotestStartMovieShots()
 
 bool devAutotestRun()
 {
+    compat_setFixedClock(true);
+    compat_setFrameHook(frameHook);
     if (!contracts()) return false;
 
     const char* theme = getenv("FALLOUT_AUTOTEST_THEME");
@@ -288,10 +323,7 @@ bool devAutotestGameRun()
     gLiveName = "05b-loadsave-live";
     gLiveX = 0.75f;
     gLiveY = 0.945f;
-    if (SDL_AddTimer(2500, liveTimer, nullptr) == 0) {
-        SDL_Log("autotest: no timer: %s", SDL_GetError());
-        return false;
-    }
+    schedule(2500, liveTimer);
     int rc = LoadGame(LOAD_SAVE_MODE_NORMAL);
     SDL_Log("autotest: LoadGame returned %d (0 = cancelled by touch)", rc);
 
@@ -301,7 +333,7 @@ bool devAutotestGameRun()
     gLiveName = "07b-pipboy-live";
     gLiveX = 0.9f;
     gLiveY = 0.065f;
-    SDL_AddTimer(2500, liveTimer, nullptr);
+    schedule(2500, liveTimer);
     int pipRc = pipboy(PIPBOY_OPEN_INTENT_UNSPECIFIED);
     SDL_Log("autotest: pipboy returned %d", pipRc);
 

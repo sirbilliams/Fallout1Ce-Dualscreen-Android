@@ -1,4 +1,5 @@
 #include "plib/gnw/touch.h"
+#include "platform_compat.h"
 
 #include <algorithm>
 #include <stack>
@@ -98,7 +99,7 @@ void touch_handle_start(SDL_TouchFingerEvent* event)
         Touch* touch = &(touches[index]);
         touch->used = true;
         touch->fingerId = event->fingerId;
-        touch->startTimestamp = event->timestamp;
+        touch->startTimestamp = compat_eventTime(event->timestamp);
         touch->startLocation.x = static_cast<int>(event->x * screenGetWidth());
         touch->startLocation.y = static_cast<int>(event->y * screenGetHeight());
         touch->currentTimestamp = touch->startTimestamp;
@@ -112,7 +113,7 @@ void touch_handle_move(SDL_TouchFingerEvent* event)
     int index = find_touch(event->fingerId);
     if (index != -1) {
         Touch* touch = &(touches[index]);
-        touch->currentTimestamp = event->timestamp;
+        touch->currentTimestamp = compat_eventTime(event->timestamp);
         touch->currentLocation.x = static_cast<int>(event->x * screenGetWidth());
         touch->currentLocation.y = static_cast<int>(event->y * screenGetHeight());
         touch->phase = TOUCH_PHASE_MOVED;
@@ -124,7 +125,7 @@ void touch_handle_end(SDL_TouchFingerEvent* event)
     int index = find_touch(event->fingerId);
     if (index != -1) {
         Touch* touch = &(touches[index]);
-        touch->currentTimestamp = event->timestamp;
+        touch->currentTimestamp = compat_eventTime(event->timestamp);
         touch->currentLocation.x = static_cast<int>(event->x * screenGetWidth());
         touch->currentLocation.y = static_cast<int>(event->y * screenGetHeight());
         touch->phase = TOUCH_PHASE_ENDED;
@@ -263,7 +264,7 @@ void touch_process_gesture()
                 currentGesture.x = currentCentroid.x;
                 currentGesture.y = currentCentroid.y;
                 gestureEventsQueue.push(currentGesture);
-            } else if (SDL_GetTicks() - touches[active[0]].startTimestamp >= LONG_PRESS_MINIMUM_DURATION) {
+            } else if (compat_ticks() - touches[active[0]].startTimestamp >= LONG_PRESS_MINIMUM_DURATION) {
                 currentGesture.type = kLongPress;
                 currentGesture.state = kBegan;
                 currentGesture.numberOfTouches = activeCount;

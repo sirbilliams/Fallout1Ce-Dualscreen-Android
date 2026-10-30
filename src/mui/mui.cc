@@ -3,6 +3,7 @@
 #include "mui/mui_gameskin.h"
 #include "mui/mui_settings.h"
 #include "mui/mui_skin.h"
+#include "platform_compat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -215,7 +216,7 @@ namespace {
 
         // Only touches not begun on screen yet: a pressed one gets its end.
         if (!gSurface->pointer.down) {
-            dropStaleTouches(SDL_GetTicks());
+            dropStaleTouches(compat_ticks());
         }
 
         while (!gSurface->events.empty()) {
@@ -417,7 +418,7 @@ bool MuiContext::touchable(const std::string& id, const MuiRect& rect, bool* pre
     }
 
     if (longPressed != nullptr && gSurface->pointer.down && !gSurface->pointer.moved && !gSurface->activeLongPressed
-        && SDL_GetTicks() - gSurface->pointer.downTime >= kLongPressMs) {
+        && compat_ticks() - gSurface->pointer.downTime >= kLongPressMs) {
         gSurface->activeLongPressed = true;
         *longPressed = true;
     }
@@ -872,7 +873,7 @@ void muiPush(MuiScreen* screen)
 {
     muiRemove(screen);
     screen->finished = false;
-    screen->openTime = SDL_GetTicks();
+    screen->openTime = compat_ticks();
     gScreens.push_back(screen);
 
     // New screen doesn't continue a touch that started below it.
@@ -1019,7 +1020,7 @@ bool muiHoldsFrame()
         return false;
     }
 
-    unsigned int now = SDL_GetTicks();
+    unsigned int now = compat_ticks();
     if (holdStart == 0) {
         holdStart = now;
     }
@@ -1112,7 +1113,7 @@ static void muiRenderSurface(SDL_Renderer* renderer, MuiSurface surface, int wid
     gSurface->outputHeight = height;
     gSurface->pixelsPerDp = density * static_cast<float>(settings.touch.hud_scale) / 100.0f;
 
-    unsigned int now = SDL_GetTicks();
+    unsigned int now = compat_ticks();
     updateSafeRect(now);
     processEvents();
 
@@ -1382,7 +1383,7 @@ bool muiHandleFingerEvent(const SDL_Event* event)
 
         surface.fingerCaptured = true;
         surface.capturedFinger = finger.fingerId;
-        surface.events.push_back({ PointerEventType::Down, x, y, finger.timestamp });
+        surface.events.push_back({ PointerEventType::Down, x, y, compat_eventTime(finger.timestamp) });
         return true;
     }
 
@@ -1401,9 +1402,9 @@ bool muiHandleFingerEvent(const SDL_Event* event)
     }
 
     if (event->type == SDL_FINGERMOTION) {
-        surface.events.push_back({ PointerEventType::Move, x, y, finger.timestamp });
+        surface.events.push_back({ PointerEventType::Move, x, y, compat_eventTime(finger.timestamp) });
     } else if (event->type == SDL_FINGERUP) {
-        surface.events.push_back({ PointerEventType::Up, x, y, finger.timestamp });
+        surface.events.push_back({ PointerEventType::Up, x, y, compat_eventTime(finger.timestamp) });
         surface.fingerCaptured = false;
     }
 
@@ -1436,7 +1437,7 @@ bool muiForgetMissingFingers(const SDL_FingerID* down, int count)
     for (Surface* surface : surfaces) {
         // Released far outside: nothing is tapped.
         if (surface->fingerCaptured && !isDown(surface->capturedFinger)) {
-            surface->events.push_back({ PointerEventType::Up, -1.0e6f, -1.0e6f, SDL_GetTicks() });
+            surface->events.push_back({ PointerEventType::Up, -1.0e6f, -1.0e6f, compat_ticks() });
             surface->fingerCaptured = false;
             forgotten = true;
         }
