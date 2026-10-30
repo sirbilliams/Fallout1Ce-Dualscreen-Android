@@ -1332,7 +1332,7 @@ void muiHandleTextInput(const char* text)
 
 bool muiHandleFingerEvent(const SDL_Event* event)
 {
-    
+
     const SDL_TouchFingerEvent& finger = event->tfinger;
 
     // The bottom screen's fingers (bottom_screen.cc) are its own: all of

@@ -8,7 +8,6 @@
 
 namespace fallout {
 
-
 // Drawing primitives of the mobile UI (see mui.h). Everything is in renderer
 // output pixels (physical screen pixels), not in game logical pixels.
 

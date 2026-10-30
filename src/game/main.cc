@@ -2,8 +2,8 @@
 
 #include "bottom_screen.h"
 #include "dev_autotest.h"
-#include "mui/mui_dash.h"
 #include "mobile_contracts.h"
+#include "mui/mui_dash.h"
 #include <cstdlib>
 
 // NOTE: Actual file name is unknown. Functions in this module do not present

@@ -16,7 +16,6 @@
 #include "plib/color/color.h"
 #include "plib/gnw/svga.h"
 
-
 namespace fallout {
 
 namespace {
