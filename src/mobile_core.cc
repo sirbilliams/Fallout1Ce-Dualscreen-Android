@@ -2,6 +2,9 @@
 #include "game/config.h"
 #include "game/gconfig.h"
 #include "mobile_contracts.h"
+#include "mui/mui.h"
+#include "mui/mui_settings.h"
+#include "plib/gnw/svga.h"
 #include "plib/gnw/text.h"
 #include <deque>
 #include <utility>
@@ -42,6 +45,11 @@ void mobileRenderBottom()
 {
     MobileSettings settings = mobileSettings();
     if (!settings.enabled || !settings.bottomScreen) return;
+    muiSettingsRefresh();
+    if (gSdlRenderer != nullptr) {
+        muiRenderBottom(gSdlRenderer);
+        return;
+    }
     int width, height;
     bottomScreenGetSize(&width, &height);
     if (width <= 0 || height <= 0 || width > 8192 || height > 8192) return;

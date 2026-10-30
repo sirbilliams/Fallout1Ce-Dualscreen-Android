@@ -29,7 +29,17 @@ else()
     add_executable(${EXECUTABLE_NAME} WIN32 MACOSX_BUNDLE)
 endif()
 
-target_sources(${EXECUTABLE_NAME} PRIVATE src/mobile_core.cc)
+target_sources(${EXECUTABLE_NAME} PRIVATE
+    src/mobile_core.cc
+    src/dev_autotest.cc
+    src/mui/mui_scenes_f1.cc
+    src/mui/mui.cc
+    src/mui/mui_dash.cc
+    src/mui/mui_draw.cc
+    src/mui/mui_gameskin.cc
+    src/mui/mui_icons.cc
+    src/mui/mui_settings.cc
+    src/mui/mui_skin.cc)
 if(ANDROID)
     target_sources(${EXECUTABLE_NAME} PRIVATE src/bottom_screen.cc)
     target_link_libraries(${EXECUTABLE_NAME} android log)

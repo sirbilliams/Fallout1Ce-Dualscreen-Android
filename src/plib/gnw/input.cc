@@ -5,6 +5,7 @@
 
 #include "audio_engine.h"
 #include "mobile_contracts.h"
+#include "mui/mui.h"
 #include "platform_compat.h"
 #include "plib/color/color.h"
 #include "plib/gnw/button.h"
@@ -1097,12 +1098,15 @@ void GNW95_process_message()
             handleMouseEvent(&e);
             break;
         case SDL_FINGERDOWN:
+            if (muiHandleFingerEvent(&e)) break;
             if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_start(&(e.tfinger));
             break;
         case SDL_FINGERMOTION:
+            if (muiHandleFingerEvent(&e)) break;
             if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_move(&(e.tfinger));
             break;
         case SDL_FINGERUP:
+            if (muiHandleFingerEvent(&e)) break;
             if (e.tfinger.touchId != kMobileBottomTouchId) touch_handle_end(&(e.tfinger));
             break;
         case SDL_KEYDOWN:

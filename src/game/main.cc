@@ -1,6 +1,7 @@
 #include "main.h"
 
 #include "bottom_screen.h"
+#include "dev_autotest.h"
 #include "mobile_contracts.h"
 #include <cstdlib>
 
@@ -124,42 +125,12 @@ int gnw_main(int argc, char** argv)
             int mainMenuRc;
             if (devAutotest) {
 #ifndef __ANDROID__
-                MobileSnapshot testSnapshot;
-                testSnapshot.generation = 1;
-                mobilePublishSnapshot(testSnapshot);
-                MobileCommand command;
-                command.generation = 1;
-                for (int i = 0; i < 64; ++i) {
-                    command.id = i;
-                    if (!mobileQueueCommand(command)) std::exit(2);
-                }
-                if (mobileQueueCommand(command)) std::exit(2);
-                for (int i = 0; i < 64; ++i) {
-                    if (!mobileTakeCommand(&command) || command.id != i) std::exit(2);
-                }
-                mobileQueueCommand(command);
-                testSnapshot.generation = 2;
-                mobilePublishSnapshot(testSnapshot);
-                if (mobileTakeCommand(&command) || mobileQueueCommand(command)) std::exit(2);
-                bottomScreenSetTest(640, 480, 1.0f);
-                mobileRenderBottom();
-                if (!bottomScreenAvailable() || bottomScreenTestFrame() == nullptr) std::exit(2);
-                bottomScreenSetTest(0, 0, 1.0f);
-                if (bottomScreenAvailable() || bottomScreenTestFrame() != nullptr) std::exit(2);
-                mobileRenderBottom();
-                bottomScreenSetTest(480, 640, 1.0f);
-                mobileRenderBottom();
-                if (bottomScreenTestFrame() == nullptr) std::exit(2);
-                bottomScreenSetTest(0, 0, 1.0f);
-                mobilePublishSnapshot(MobileSnapshot {});
-#endif
-                renderPresent();
-                const char* capture = std::getenv("FALLOUT_AUTOTEST_BMP");
-                if (capture == nullptr || SDL_SaveBMP(gSdlTextureSurface, capture) != 0) {
-                    SDL_Log("main-menu capture failed: %s", SDL_GetError());
+                if (!devAutotestRun()) {
+                    SDL_Log("dev-autotest failed");
                     std::exit(2);
                 }
-                SDL_Log("dev-autotest: main menu captured");
+#endif
+                SDL_Log("dev-autotest: done");
                 mainMenuRc = MAIN_MENU_EXIT;
             } else {
                 mainMenuRc = main_menu_loop();

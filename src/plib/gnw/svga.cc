@@ -1,5 +1,6 @@
 #include "plib/gnw/svga.h"
 #include "mobile_contracts.h"
+#include "mui/mui.h"
 
 #include "plib/gnw/gnw.h"
 #include "plib/gnw/grbuf.h"
@@ -215,6 +216,7 @@ static void destroyRenderer()
     }
 
     if (gSdlRenderer != NULL) {
+        muiResetRenderer();
         SDL_DestroyRenderer(gSdlRenderer);
         gSdlRenderer = NULL;
     }
@@ -232,6 +234,7 @@ void renderPresent()
     SDL_UpdateTexture(gSdlTexture, NULL, gSdlTextureSurface->pixels, gSdlTextureSurface->pitch);
     SDL_RenderClear(gSdlRenderer);
     SDL_RenderCopy(gSdlRenderer, gSdlTexture, NULL, NULL);
+    muiRender(gSdlRenderer);
     SDL_RenderPresent(gSdlRenderer);
     mobileRenderBottom();
 }

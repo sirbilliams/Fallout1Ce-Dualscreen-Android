@@ -430,4 +430,30 @@ static void swapInt16(short* value)
     swapUInt16(reinterpret_cast<unsigned short*>(value));
 }
 
+bool interfaceFontGetMetrics(int font, int* maxHeight, int* letterSpacing, int* wordSpacing)
+{
+    if (font < 0 || font >= INTERFACE_FONT_MAX || gFontCache[font].data == nullptr) {
+        return false;
+    }
+    *maxHeight = gFontCache[font].maxHeight;
+    *letterSpacing = gFontCache[font].letterSpacing;
+    *wordSpacing = gFontCache[font].wordSpacing;
+    return true;
+}
+
+bool interfaceFontGetGlyph(int font, unsigned char ch, int* width, int* height, const unsigned char** pixels)
+{
+    if (font < 0 || font >= INTERFACE_FONT_MAX || gFontCache[font].data == nullptr) {
+        return false;
+    }
+    const InterfaceFontGlyph& glyph = gFontCache[font].glyphs[ch];
+    if (glyph.width <= 0 || glyph.height <= 0) {
+        return false;
+    }
+    *width = glyph.width;
+    *height = glyph.height;
+    *pixels = gFontCache[font].data + glyph.offset;
+    return true;
+}
+
 } // namespace fallout
