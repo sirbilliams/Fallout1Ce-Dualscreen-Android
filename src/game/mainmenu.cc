@@ -1,4 +1,5 @@
 #include "game/mainmenu.h"
+#include "mui/mui.h"
 
 #include <ctype.h>
 #include <limits.h>
@@ -327,11 +328,20 @@ int main_menu_loop()
 
     unsigned int tick = get_time();
 
+    muiMainMenuShow();
+
     int rc = -1;
     while (rc == -1) {
         sharedFpsLimiter.mark();
 
         int keyCode = get_input();
+
+        int touchChoice = muiMainMenuTakeChoice();
+        if (touchChoice != -1) {
+            main_menu_play_sound("nmselec1");
+            rc = touchChoice;
+            break;
+        }
 
         for (int buttonIndex = 0; buttonIndex < MAIN_MENU_BUTTON_COUNT; buttonIndex++) {
             if (keyCode == button_values[buttonIndex] || keyCode == toupper(button_values[buttonIndex])) {
@@ -385,6 +395,8 @@ int main_menu_loop()
         renderPresent();
         sharedFpsLimiter.throttle();
     }
+
+    muiMainMenuHide();
 
     if (oldCursorIsHidden) {
         mouse_hide();

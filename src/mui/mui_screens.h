@@ -12,6 +12,8 @@ struct MuiSceneEntry {
     MuiScreen* (*make)();
 };
 
+MuiScreen* muiMainMenuCreate();
+
 // Terminated by { nullptr, nullptr }.
 const MuiSceneEntry* muiSceneEntries();
 

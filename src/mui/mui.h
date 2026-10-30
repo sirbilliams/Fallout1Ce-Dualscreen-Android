@@ -321,6 +321,12 @@ void muiHandleTextInput(const char* text);
 // menu, as Esc on the map). Screens' Back buttons do the same.
 void muiRequestBack();
 
+// Title menu (mui_main_menu.cc): shown while the F1 menu loop runs; the loop
+// takes the choice (a MainMenuOption, -1 for none yet).
+void muiMainMenuShow();
+void muiMainMenuHide();
+int muiMainMenuTakeChoice();
+
 // Called every frame of `muiRunModal` (autotest hook).
 void muiSetModalTick(void (*tick)());
 
