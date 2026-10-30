@@ -51,6 +51,11 @@ namespace {
                 tab = index;
                 choice = tabs[index].key;
             }
+            if (tab == index) {
+                // The open tab's lamp: a glow and a bar at its foot.
+                muiFillRect(rect.inset(ui.dp(3.0f)), muiSkinInk().accent.withAlpha(34));
+                muiFillRect({ rect.x + ui.dp(8.0f), rect.bottom() - ui.dp(7.0f), rect.w - ui.dp(16.0f), ui.dp(3.0f) }, muiSkinInk().accent);
+            }
         }
 
         MuiRect body = { content.x, content.y + tabHeight + gap, content.w, content.h - tabHeight - gap };
@@ -64,12 +69,12 @@ namespace {
                 rows.push_back({ muiDecodeGameText(quest.c_str()), U"" });
             }
             if (view.quests.empty()) {
-                rows.push_back({ U"NOTHING YET", U"", false, false, true });
+                rows.push_back({ U"Nothing yet", U"", false, false, true });
             }
             keyBase = 507 - 3;
         } else if (tab == 1) {
             rows.push_back({ U"AUTOMAPS", U"", true });
-            rows.push_back({ U"OPEN THE MAP LIST ON THE MAIN SCREEN", U"", false, false, true });
+            rows.push_back({ U"Open the map list on the main screen", U"", false, false, true });
             keyBase = -1;
         } else if (tab == 2) {
             rows.push_back({ U"HOLODISKS", U"", true });
@@ -77,7 +82,7 @@ namespace {
                 rows.push_back({ muiDecodeGameText(disk.c_str()), U"" });
             }
             if (view.disks.empty()) {
-                rows.push_back({ U"NO HOLODISKS", U"", false, false, true });
+                rows.push_back({ U"No holodisks", U"", false, false, true });
             }
             keyBase = 506 - 1;
         } else {
@@ -102,7 +107,6 @@ namespace {
                 choice = 510 + index;
             }
         }
-        (void)theme;
     }
 
     PipboyScreen* gScreen = nullptr;

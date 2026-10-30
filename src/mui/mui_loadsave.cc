@@ -59,10 +59,10 @@ namespace {
             snprintf(number, sizeof(number), "%02d  ", static_cast<int>(index) + 1);
             MuiRow row;
             if (slot.empty) {
-                row.left = muiDecodeUtf8(number) + U"- EMPTY -";
+                row.left = muiDecodeUtf8(number) + U"Empty slot";
                 row.dim = true;
             } else if (slot.broken) {
-                row.left = muiDecodeUtf8(number) + U"- UNUSABLE -";
+                row.left = muiDecodeUtf8(number) + U"Unusable save";
                 row.dim = true;
             } else {
                 row.left = muiDecodeUtf8(number) + muiDecodeGameText(slot.description.c_str());

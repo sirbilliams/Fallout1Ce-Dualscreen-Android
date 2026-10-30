@@ -562,13 +562,14 @@ static int mui_pipboy_sync(int keyCode)
     }
     view.canRest = critter_can_obj_dude_rest();
     char line[64];
-    snprintf(line, sizeof(line), "HP %d/%d", critter_get_hits(obj_dude), stat_level(obj_dude, STAT_MAXIMUM_HIT_POINTS));
+    snprintf(line, sizeof(line), "HP %d/%d   RADS %d", critter_get_hits(obj_dude), stat_level(obj_dude, STAT_MAXIMUM_HIT_POINTS), critter_get_rads(obj_dude));
     view.hp = line;
     int month;
     int day;
     int year;
     game_time_date(&month, &day, &year);
-    snprintf(line, sizeof(line), "%02d:%02d   %d/%d/%d", game_time_hour() / 100, game_time_hour() % 100, day, month, year);
+    static const char* const months[12] = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
+    snprintf(line, sizeof(line), "%02d:%02d   %d %s %d", game_time_hour() / 100, game_time_hour() % 100, day, months[(month >= 1 && month <= 12 ? month : 1) - 1], year);
     view.place = line;
     muiPipboyUpdate(view);
 

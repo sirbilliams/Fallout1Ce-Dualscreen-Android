@@ -145,22 +145,22 @@ namespace {
             MuiRow row;
             row.left = text(item_name(item));
             if ((item->flags & OBJECT_WORN) != 0) {
-                row.left += U"  [WORN]";
+                row.left += U"  (worn)";
             }
             if ((item->flags & OBJECT_IN_RIGHT_HAND) != 0) {
-                row.left += U"  [R]";
+                row.left += U"  (right hand)";
             }
             if ((item->flags & OBJECT_IN_LEFT_HAND) != 0) {
-                row.left += U"  [L]";
+                row.left += U"  (left hand)";
             }
             int quantity = quantityOf(item);
-            row.right = (quantity > 1 ? U"x" + number(quantity) + U"  " : std::u32string()) + number(item_weight(item) * quantity) + U" LB";
+            row.right = (quantity > 1 ? U"x" + number(quantity) + U"  " : std::u32string()) + (item_weight(item) > 0 ? number(item_weight(item) * quantity) + U" LB" : U"-");
             row.selected = static_cast<int>(index) == selected;
             row.icon = item_inv_fid(item);
             rows.push_back(row);
         }
         if (rows.empty()) {
-            rows.push_back({ U"NOTHING CARRIED", U"", false, false, true });
+            rows.push_back({ U"Nothing carried", U"", false, false, true });
         }
         int tapped = muiListView(ui, "inventory.list", list, rows, 46.0f);
         if (tapped >= 0 && tapped < static_cast<int>(items.size())) {
@@ -175,12 +175,21 @@ namespace {
             float size = ui.dp(14.0f);
             auto lines = muiWrapText(description, infoInner.w, size);
             float y = infoInner.y;
-            for (size_t index = 0; index < lines.size() && y + muiLineHeight(size) <= infoInner.bottom(); index++) {
-                muiDrawText(lines[index], infoInner.x, y, size, theme.text);
+            size_t fit = std::max<size_t>(1, static_cast<size_t>(infoInner.h / muiLineHeight(size)));
+            for (size_t index = 0; index < lines.size() && index < fit; index++) {
+                std::u32string line = lines[index];
+                if (index + 1 == fit && lines.size() > fit) {
+                    // More text than room: cut with an ellipsis, not mid-word.
+                    while (!line.empty() && muiTextWidth(line + U"..", size) > infoInner.w) {
+                        line.pop_back();
+                    }
+                    line += U"..";
+                }
+                muiDrawText(line, infoInner.x, y, size, theme.text);
                 y += muiLineHeight(size);
             }
         } else {
-            muiDrawTextAligned(U"SELECT AN ITEM", infoInner, ui.dp(15.0f), theme.textDim, MuiAlign::Center, MuiAlign::Center);
+            muiDrawTextAligned(U"Select an item", infoInner, ui.dp(15.0f), theme.textDim, MuiAlign::Center, MuiAlign::Center);
         }
 
         if (item == nullptr) {

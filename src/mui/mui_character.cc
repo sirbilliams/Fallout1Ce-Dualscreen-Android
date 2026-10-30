@@ -132,7 +132,7 @@ namespace {
         MuiRect header = { content.x, content.y, content.w, headerHeight };
         ui.panel(header);
         MuiRect inner = header.inset(ui.dp(12.0f));
-        std::u32string who = name(critter_name(obj_dude));
+        std::u32string who = muiPlayerName();
         muiDrawTextAligned(who, { inner.x, inner.y, inner.w, inner.h * 0.5f }, ui.dp(22.0f), theme.accent, MuiAlign::Start, MuiAlign::Center);
         char line[96];
         snprintf(line, sizeof(line), "LEVEL %d   XP %d   HP %d/%d", stat_pc_get(PC_STAT_LEVEL), stat_pc_get(PC_STAT_EXPERIENCE), critter_get_hits(obj_dude), stat_level(obj_dude, STAT_MAXIMUM_HIT_POINTS));

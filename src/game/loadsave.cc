@@ -1892,7 +1892,10 @@ static void mui_show_slots(bool saving)
             snprintf(buffer, sizeof(buffer), "%s", LSData[index].description);
             slots[index].description = buffer[0] != '\0' ? buffer : LSData[index].characterName;
             char* place = map_get_short_name(LSData[index].map);
-            snprintf(buffer, sizeof(buffer), "%s  %d/%d/%d", place != nullptr ? place : "", LSData[index].fileMonth, LSData[index].fileDay, LSData[index].fileYear);
+            static const char* const months[12] = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
+            int month = LSData[index].fileMonth;
+            // Same date style as the dashboard: "17 DEC 2016".
+            snprintf(buffer, sizeof(buffer), "%s, %d %s %d", place != nullptr ? place : "", LSData[index].fileDay, months[(month >= 1 && month <= 12 ? month : 1) - 1], LSData[index].fileYear);
             slots[index].place = buffer;
         }
     }

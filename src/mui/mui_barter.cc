@@ -17,6 +17,11 @@ namespace {
         return muiDecodeUtf8(buffer);
     }
 
+    std::u32string capsText(int value)
+    {
+        return number(value) + (value == 1 ? U" cap" : U" caps");
+    }
+
     // Touch trading screen. The classic barter loop (inventry.cc) stays in
     // charge: it feeds this screen the four item lists every frame and takes
     // its taps back as moves (done by the loop with the engine's own item
@@ -45,13 +50,19 @@ namespace {
             std::vector<MuiRow> rows;
             for (const MuiBarterItem& item : items) {
                 MuiRow row;
-                row.left = muiDecodeGameText(item.name.c_str());
-                row.right = (item.quantity > 1 ? U"x" + number(item.quantity) + U"  " : std::u32string()) + (showPrice ? number(item.unitCost * item.quantity) : std::u32string());
+                bool money = item.name.rfind("Bottle Cap", 0) == 0;
+                row.left = money ? U"Bottle caps" : muiDecodeGameText(item.name.c_str());
+                if (money) {
+                    // Caps are their own price: the name says what the figure is.
+                    row.right = number(item.quantity);
+                } else {
+                    row.right = (item.quantity > 1 ? U"x" + number(item.quantity) : std::u32string()) + (showPrice ? (item.quantity > 1 ? U"  " : U"") + capsText(item.unitCost * item.quantity) : std::u32string());
+                }
                 row.icon = item.fid;
                 rows.push_back(row);
             }
             if (rows.empty()) {
-                rows.push_back({ U"EMPTY", U"", false, false, true });
+                rows.push_back({ U"Nothing here", U"", false, false, true });
             }
             int tapped = muiListView(ui, id, body, rows, 44.0f);
             if (tapped >= 0 && tapped < static_cast<int>(items.size())) {
@@ -94,15 +105,15 @@ namespace {
         ui.panel(bar);
         MuiRect inner = bar.inset(ui.dp(10.0f), 0.0f);
         bool enough = view.offerValue >= view.askValue;
-        muiDrawTextAligned(U"OFFER $" + number(view.offerValue), inner, ui.dp(20.0f), enough ? theme.accent : theme.text, MuiAlign::Start, MuiAlign::Center);
-        muiDrawTextAligned(U"ASKING $" + number(view.askValue), inner, ui.dp(20.0f), theme.text, MuiAlign::End, MuiAlign::Center);
+        muiDrawTextAligned(U"Your offer: " + capsText(view.offerValue), inner, ui.dp(20.0f), enough ? theme.accent : theme.text, MuiAlign::Start, MuiAlign::Center);
+        muiDrawTextAligned(U"They want: " + capsText(view.askValue), inner, ui.dp(20.0f), theme.text, MuiAlign::End, MuiAlign::Center);
 
         y += totals + gap;
         float third = (content.w - gap * 2.0f) / 3.0f;
         if (ui.button("barter.amount", { content.x, y, third, footer }, moveAll ? U"MOVE: ALL" : U"MOVE: ONE")) {
             moveAll = !moveAll;
         }
-        if (ui.button("barter.offerbtn", { content.x + third + gap, y, third, footer }, U"OFFER", MuiButtonStyle::Primary)) {
+        if (ui.button("barter.offerbtn", { content.x + third + gap, y, third, footer }, U"TRADE", MuiButtonStyle::Primary)) {
             action = { MuiBarterAction::Offer, 0, false };
         }
         if (ui.button("barter.talk", { content.x + (third + gap) * 2.0f, y, third, footer }, U"TALK")) {
