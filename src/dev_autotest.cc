@@ -313,7 +313,10 @@ bool devAutotestGameRun()
         SDL_Log("autotest: dialogue with pid %x", obj->pid);
         obj_move_to_tile(obj_dude, obj->tile + 2, obj->elevation, nullptr);
         classicShot(dir, "24-classic-dialogue", 4000);
+        gClassicQuit = true; // Escape does not close a conversation: quit it
         gdialog_enter(obj, 0);
+        gClassicQuit = false;
+        game_user_wants_to_quit = 0;
         break;
     }
     config_set_value(&game_config, "touch", "enabled", 1);

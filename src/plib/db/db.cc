@@ -141,6 +141,21 @@ static size_t read_threshold = 16384;
 // 0x539D54
 static db_read_callback* read_callback = NULL;
 
+// CE: Runs the read callback without re-entering it. The callback can redraw
+// the map, which loads protos, which reads from the database again; with the
+// read counter still above the threshold that recursed until the stack
+// overflowed (crash during map load).
+static void db_run_read_callback()
+{
+    static bool running = false;
+    if (running) {
+        return;
+    }
+    running = true;
+    read_callback();
+    running = false;
+}
+
 // 0x6713C8
 static DB_DATABASE* database_list[DB_DATABASE_LIST_CAPACITY];
 
@@ -402,7 +417,7 @@ int db_read_to_buf(const char* filename, unsigned char* buf)
                     remaining_size -= bytes_read;
 
                     read_count = 0;
-                    read_callback();
+                    db_run_read_callback();
 
                     chunk_size = read_threshold;
                 }
@@ -462,7 +477,7 @@ int db_read_to_buf(const char* filename, unsigned char* buf)
                 remaining_size -= bytes_read;
 
                 read_count = 0;
-                read_callback();
+                db_run_read_callback();
 
                 chunk_size = read_threshold;
             }
@@ -489,13 +504,13 @@ int db_read_to_buf(const char* filename, unsigned char* buf)
 
                         while (read_count >= read_threshold) {
                             read_count -= read_threshold;
-                            read_callback();
+                            db_run_read_callback();
                         }
                     } else {
                         read_count += lzss_decode_to_buf(current_database->stream, buf, v4);
                         while (read_count >= read_threshold) {
                             read_count -= read_threshold;
-                            read_callback();
+                            db_run_read_callback();
                         }
                     }
                 }
@@ -693,7 +708,7 @@ size_t db_fread(void* ptr, size_t size, size_t count, DB_FILE* stream)
                     elements_read += bytes_read;
 
                     read_count = 0;
-                    read_callback();
+                    db_run_read_callback();
 
                     chunk_size = read_threshold;
                 }
@@ -730,7 +745,7 @@ size_t db_fread(void* ptr, size_t size, size_t count, DB_FILE* stream)
                                     stream->field_10 -= chunk_size;
 
                                     read_count = 0;
-                                    read_callback();
+                                    db_run_read_callback();
 
                                     chunk_size = read_threshold;
                                 }
@@ -773,7 +788,7 @@ size_t db_fread(void* ptr, size_t size, size_t count, DB_FILE* stream)
                                         elements_read += bytes_read;
 
                                         read_count = 0;
-                                        read_callback();
+                                        db_run_read_callback();
 
                                         chunk_size = read_threshold;
                                     }
@@ -828,7 +843,7 @@ size_t db_fread(void* ptr, size_t size, size_t count, DB_FILE* stream)
                                     read_count += v1;
                                     if (read_count >= read_threshold) {
                                         read_count = 0;
-                                        read_callback();
+                                        db_run_read_callback();
                                     }
 
                                     chunk_size = read_threshold - read_count;
@@ -952,8 +967,8 @@ int db_fgetc(DB_FILE* stream)
     if (read_callback != NULL) {
         read_count++;
         if (read_count >= read_threshold) {
-            read_callback();
             read_count = 0;
+            db_run_read_callback();
         }
     }
 
