@@ -50,6 +50,8 @@ void combat_anim_finished();
 int combat_check_bad_shot(Object* attacker, Object* defender, int hitMode, bool aiming);
 bool combat_to_hit(Object* target, int* accuracy);
 void combat_attack_this(Object* a1);
+void combat_set_preset_hit_location(int location);
+char* combat_get_loc_name(Object* critter, int hitLocation);
 void combat_outline_on();
 void combat_outline_off();
 void combat_highlight_change();

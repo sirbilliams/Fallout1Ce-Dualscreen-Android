@@ -76,7 +76,7 @@ static void combat_display_hit(char* dest, size_t size, Object* critter_obj, int
 static void combat_display_flags(char* a1, int flags, Object* a3);
 static void combat_standup(Object* a1);
 static void print_tohit(unsigned char* dest, int dest_pitch, int a3);
-static char* combat_get_loc_name(Object* critter, int hitLocation);
+char* combat_get_loc_name(Object* critter, int hitLocation);
 static void draw_loc_off(int a1, int a2);
 static void draw_loc_on(int a1, int a2);
 static void draw_loc(int eventCode, int color);
@@ -1511,6 +1511,9 @@ MessageList combat_message_file;
 
 // 0x56BC70
 static Object* call_target;
+// Bottom screen's called shot: the part it picked, used instead of the modal
+// window for the next attack (-1 none).
+static int combat_preset_location = -1;
 
 // 0x56BC74
 static int call_win;
@@ -4177,7 +4180,7 @@ static void print_tohit(unsigned char* dest, int destPitch, int accuracy)
 }
 
 // 0x423740
-static char* combat_get_loc_name(Object* critter, int hitLocation)
+char* combat_get_loc_name(Object* critter, int hitLocation)
 {
     MessageListItem messageListItem;
     messageListItem.num = 1000 + 10 * art_alias_num(critter->fid & 0xFFF) + hitLocation;
@@ -4571,9 +4574,16 @@ void combat_attack_this(Object* a1)
     }
 
     int hitLocation;
-    if (get_called_shot_location(a1, &hitLocation, hitMode) != -1) {
+    if (combat_preset_location != -1) {
+        combat_attack(obj_dude, a1, hitMode, combat_preset_location);
+    } else if (get_called_shot_location(a1, &hitLocation, hitMode) != -1) {
         combat_attack(obj_dude, a1, hitMode, hitLocation);
     }
+}
+
+void combat_set_preset_hit_location(int location)
+{
+    combat_preset_location = location;
 }
 
 // 0x424074

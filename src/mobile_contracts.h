@@ -42,7 +42,15 @@ enum class MobileCommandType { OpenScreen,
     CycleAttackMode,
     Menu,
     Save,
-    Load };
+    Load,
+    // The combat panel and the live map (bottom screen). AttackTarget: id =
+    // object id of the critter, value = hit location for a called shot (-1: the
+    // active attack mode as it is). SetAttackAction: id = InterfaceItemAction
+    // (intface.h). UseQuickItem: id = object id of a drug in dude's inventory.
+    // Walk: id = tile (value 1 - run).
+    AttackTarget,
+    SetAttackAction,
+    UseQuickItem };
 struct MobileCommand {
     uint64_t generation = 0;
     MobileCommandType type = MobileCommandType::CloseScreen;

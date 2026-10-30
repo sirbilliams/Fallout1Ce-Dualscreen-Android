@@ -1572,6 +1572,56 @@ int intface_get_current_state(int* action, bool* isWeapon, bool* isDisabled)
     return 0;
 }
 
+// Bottom screen's combat panel: the attack modes the active item has (the ones
+// `intface_toggle_item_state` cycles through, in its order) and picking one.
+int intface_get_available_actions(int* actions, int capacity)
+{
+    if (interfaceWindow == -1) {
+        return 0;
+    }
+    const InterfaceItemState* state = &(itemButtonItems[itemCurrentItem]);
+    if (state->isWeapon == 0) {
+        return 0;
+    }
+    bool secondary = state->secondaryHitMode != HIT_MODE_PUNCH
+        && state->secondaryHitMode != HIT_MODE_KICK
+        && item_w_subtype(state->item, state->secondaryHitMode) != ATTACK_TYPE_NONE;
+    int found[4];
+    int count = 0;
+    found[count++] = INTERFACE_ITEM_ACTION_PRIMARY;
+    if (item_w_called_shot(obj_dude, state->primaryHitMode)) {
+        found[count++] = INTERFACE_ITEM_ACTION_PRIMARY_AIMING;
+    }
+    if (secondary) {
+        found[count++] = INTERFACE_ITEM_ACTION_SECONDARY;
+        if (item_w_called_shot(obj_dude, state->secondaryHitMode)) {
+            found[count++] = INTERFACE_ITEM_ACTION_SECONDARY_AIMING;
+        }
+    }
+    int written = 0;
+    for (int index = 0; index < count && written < capacity; index++) {
+        actions[written++] = found[index];
+    }
+    return written;
+}
+
+bool intface_set_item_action(int action)
+{
+    int actions[4];
+    int count = intface_get_available_actions(actions, 4);
+    for (int index = 0; index < count; index++) {
+        if (actions[index] == action) {
+            InterfaceItemState* state = &(itemButtonItems[itemCurrentItem]);
+            if (state->action != action) {
+                state->action = action;
+                intface_redraw_items();
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 // 0x454F50
 int intface_update_ammo_lights()
 {
