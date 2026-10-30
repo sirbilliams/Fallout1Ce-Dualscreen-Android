@@ -1,5 +1,5 @@
-#include "dev_autotest.h"
 #include "game/game.h"
+#include "dev_autotest.h"
 
 #include <stdio.h>
 #include <string.h>
