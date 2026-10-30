@@ -44,6 +44,7 @@ MuiScreen* muiCharacterCreate();
 MuiScreen* muiInventoryCreate();
 MuiScreen* muiLoadSaveCreate();
 MuiScreen* muiDialogueCreate();
+MuiScreen* muiBarterCreate();
 MuiScreen* muiPipboyCreate();
 
 // Terminated by { nullptr, nullptr }.

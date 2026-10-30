@@ -361,6 +361,42 @@ void muiDialogueUpdate(const char* name, const char* reply, const std::vector<st
 int muiDialogueTakeChoice();
 void muiDialogueHide();
 
+// Barter (mui_barter.cc), fed every frame by the classic barter loop
+// (inventry.cc), which performs the moves the player taps.
+struct MuiBarterItem {
+    std::string name;
+    int quantity = 1;
+    int unitCost = 0;
+    // Inventory picture fid, -1 none.
+    int fid = -1;
+};
+struct MuiBarterView {
+    std::string trader;
+    std::vector<MuiBarterItem> yours;
+    std::vector<MuiBarterItem> theirs;
+    std::vector<MuiBarterItem> offer;
+    std::vector<MuiBarterItem> ask;
+    int offerValue = 0;
+    int askValue = 0;
+};
+struct MuiBarterAction {
+    enum Kind {
+        None,
+        OfferItem, // your item -> your offer
+        AskItem, // their item -> what they give
+        TakeOffer, // offer -> your items
+        TakeAsk, // asked -> their items
+        Offer, // the barter key
+        Talk, // back to the conversation
+    };
+    Kind kind;
+    int index;
+    bool all;
+};
+void muiBarterUpdate(const MuiBarterView& view);
+MuiBarterAction muiBarterTakeAction();
+void muiBarterHide();
+
 // Pip-Boy 2000 (mui_pipboy.cc), fed every frame by the classic Pip-Boy loop.
 // TakeChoice: a key code of that loop (500..504 tabs, 506.. lines), -1 none.
 struct MuiPipboyView {

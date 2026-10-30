@@ -8,6 +8,7 @@ static const MuiSceneEntry kScenes[] = {
     { "03-character", muiCharacterCreate, true },
     { "05-loadsave", muiLoadSaveCreate, false },
     { "06-dialogue", muiDialogueCreate, false },
+    { "06b-barter", muiBarterCreate, false },
     { "07-pipboy", muiPipboyCreate, false },
     { "04-inventory", muiInventoryCreate, true },
     { nullptr, nullptr, false },

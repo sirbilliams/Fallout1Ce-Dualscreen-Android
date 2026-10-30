@@ -212,6 +212,7 @@ static int barter_compute_value(Object* buyer, Object* seller);
 static int barter_attempt_transaction(Object* a1, Object* a2, Object* a3, Object* a4);
 static void barter_move_inventory(Object* a1, int quantity, int a3, int a4, Object* a5, Object* a6, bool a7);
 static void barter_move_from_table_inventory(Object* a1, int quantity, int a3, Object* a4, Object* a5, bool a6);
+static int mui_barter_sync(int keyCode, int win, Object* npc, Object* ptableObj, Object* btableObj);
 static void display_table_inventories(int win, Object* a2, Object* a3, int a4);
 static int do_move_timer(int inventoryWindowType, Object* item, int a3);
 static int setup_move_timer_win(int inventoryWindowType, Object* item);
@@ -4649,6 +4650,8 @@ void barter_inventory(int win, Object* a2, Object* a3, Object* a4, int a5)
         }
 
         keyCode = get_input();
+        barter_mod = a5 + modifier;
+        keyCode = mui_barter_sync(keyCode, win, a2, a3, a4);
         if (keyCode == KEY_CTRL_Q || keyCode == KEY_CTRL_X || keyCode == KEY_F10) {
             game_quit_with_confirm();
         }
@@ -4871,6 +4874,8 @@ void barter_inventory(int win, Object* a2, Object* a3, Object* a4, int a5)
         sharedFpsLimiter.throttle();
     }
 
+    muiBarterHide();
+
     item_move_all(a1a, a2);
     obj_erase_object(a1a, NULL);
 
@@ -4892,6 +4897,93 @@ void barter_inventory(int win, Object* a2, Object* a3, Object* a4, int a5)
 
     // NOTE: Uninline.
     inven_exit();
+}
+
+// Feeds the touch barter screen and turns its taps into the loop's own moves
+// (the same engine calls the classic drag and drop ends in) or keys.
+static int mui_barter_sync(int keyCode, int win, Object* npc, Object* ptableObj, Object* btableObj)
+{
+    if (!muiIsEnabled()) {
+        return keyCode;
+    }
+
+    auto fill = [](std::vector<MuiBarterItem>& out, Inventory* inventory) {
+        out.clear();
+        for (int index = 0; index < inventory->length; index++) {
+            InventoryItem* entry = &(inventory->items[index]);
+            MuiBarterItem item;
+            item.name = item_name(entry->item);
+            item.quantity = entry->quantity;
+            item.unitCost = item_cost(entry->item);
+            item.fid = item_inv_fid(entry->item);
+            out.push_back(item);
+        }
+    };
+
+    MuiBarterView view;
+    view.trader = critter_name(npc);
+    fill(view.yours, pud);
+    fill(view.theirs, target_pud);
+    fill(view.offer, ptable_pud);
+    fill(view.ask, btable_pud);
+    view.offerValue = item_total_cost(ptableObj);
+    view.askValue = barter_compute_value(obj_dude, npc);
+    muiBarterUpdate(view);
+
+    MuiBarterAction action = muiBarterTakeAction();
+    Inventory* source = nullptr;
+    Object* from = nullptr;
+    Object* to = nullptr;
+    switch (action.kind) {
+    case MuiBarterAction::OfferItem:
+        source = pud;
+        from = inven_dude;
+        to = ptableObj;
+        break;
+    case MuiBarterAction::AskItem:
+        source = target_pud;
+        from = npc;
+        to = btableObj;
+        break;
+    case MuiBarterAction::TakeOffer:
+        source = ptable_pud;
+        from = ptableObj;
+        to = inven_dude;
+        break;
+    case MuiBarterAction::TakeAsk:
+        source = btable_pud;
+        from = btableObj;
+        to = npc;
+        break;
+    case MuiBarterAction::Offer:
+        return KEY_LOWERCASE_M;
+    case MuiBarterAction::Talk:
+        return KEY_LOWERCASE_T;
+    default:
+        return keyCode;
+    }
+
+    if (action.index < 0 || action.index >= source->length) {
+        return keyCode;
+    }
+    InventoryItem* entry = &(source->items[action.index]);
+    int quantity = action.all ? entry->quantity : 1;
+    if (item_move_force(from, to, entry->item, quantity) == -1) {
+        MessageListItem messageListItem;
+        // 26: no space left for that item; 25: at maximum weight capacity.
+        messageListItem.num = (to == inven_dude || to == npc) ? 26 : 25;
+        if (message_search(&inventry_message_file, &messageListItem)) {
+            display_print(messageListItem.text);
+        }
+    }
+
+    // The classic window follows.
+    if (ptable_offset + inven_cur_disp > ptable_pud->length) ptable_offset = std::max(0, ptable_pud->length - inven_cur_disp);
+    if (btable_offset + inven_cur_disp > btable_pud->length) btable_offset = std::max(0, btable_pud->length - inven_cur_disp);
+    display_target_inventory(target_stack_offset[target_curr_stack], -1, target_pud, INVENTORY_WINDOW_TYPE_TRADE);
+    display_inventory(stack_offset[curr_stack], -1, INVENTORY_WINDOW_TYPE_TRADE);
+    display_table_inventories(win, ptableObj, btableObj, -1);
+    return keyCode;
 }
 
 // 0x468E58

@@ -23,6 +23,8 @@
 #include "game/map.h"
 #include "game/object.h"
 #include "game/pipboy.h"
+#include "game/proto.h"
+#include "game/proto_types.h"
 #include "game/scripts.h"
 #include "game/worldmap.h"
 #include "mobile_contracts.h"
@@ -205,6 +207,63 @@ namespace {
         schedule(delayMs, classicTimer);
     }
 
+    // Barter script (see devAutotestGameRun), one step per call.
+    std::string gBarterDir;
+    int gBarterWidth = 0;
+    int gBarterHeight = 0;
+    int gBarterStep = 0;
+
+    void barterShot(const char* name)
+    {
+        std::string base = gBarterDir + "/" + name;
+        SDL_SaveBMP(gSdlTextureSurface, (base + "-top.bmp").c_str());
+        const unsigned char* bottom = bottomScreenTestFrame();
+        if (bottom != nullptr) saveRgba(bottom, gBarterWidth, gBarterHeight, base + "-bottom.bmp");
+    }
+
+    void barterFinger(bool down, float x, float y)
+    {
+        SDL_Event event;
+        SDL_zero(event);
+        event.type = down ? SDL_FINGERDOWN : SDL_FINGERUP;
+        event.tfinger.touchId = kMobileBottomTouchId;
+        event.tfinger.fingerId = kMobileBottomTouchId + 3;
+        event.tfinger.x = x;
+        event.tfinger.y = y;
+        event.tfinger.pressure = down ? 1.0f : 0.0f;
+        SDL_PushEvent(&event);
+    }
+
+    Uint32 barterTimer(Uint32, void*)
+    {
+        switch (gBarterStep++) {
+        case 0:
+            pushKey(SDL_SCANCODE_B);
+            return 800;
+        case 1:
+            barterShot("25-barter");
+            barterFinger(true, 0.25f, 0.22f); // first of your items
+            return 200;
+        case 2:
+            barterFinger(false, 0.25f, 0.22f);
+            return 400;
+        case 3:
+            barterShot("25b-barter-offer");
+            barterFinger(true, 0.75f, 0.22f); // first of theirs
+            return 200;
+        case 4:
+            barterFinger(false, 0.75f, 0.22f);
+            return 400;
+        case 5:
+            barterShot("25c-barter-ask");
+            pushKey(SDL_SCANCODE_ESCAPE); // leaves the barter window
+            return 800;
+        default:
+            game_user_wants_to_quit = 1; // and the conversation
+            return 0;
+        }
+    }
+
     std::string gLiveDir;
     int gLiveWidth = 0;
     int gLiveHeight = 0;
@@ -380,6 +439,48 @@ bool devAutotestGameRun()
         break;
     }
     config_set_value(&game_config, "touch", "enabled", 1);
+    // Barter: a touch-driven trade with a real trader. A scheduled script
+    // (frames, not wall time) opens the barter window from the conversation,
+    // taps an item of each side over to the tables and leaves again.
+    gBarterStep = 0;
+    gBarterDir = dir;
+    gBarterWidth = width;
+    gBarterHeight = height;
+    {
+        static const char* kMaps[] = { "SHADYW.MAP", "SHADYE.MAP", "JUNKENT.MAP", "JUNKCSNO.MAP", "HUBENT.MAP", "HUBDWNTN.MAP", nullptr };
+        const char* only = getenv("FALLOUT_AUTOTEST_BARTER_MAP");
+        Object* trader = nullptr;
+        for (int mapIndex = 0; kMaps[mapIndex] != nullptr && trader == nullptr; mapIndex++) {
+            const char* name = only != nullptr ? only : kMaps[mapIndex];
+            char mapName[64];
+            snprintf(mapName, sizeof(mapName), "%s", name);
+            if (map_load(mapName) != 0) {
+                if (only != nullptr) break;
+                continue;
+            }
+            for (Object* obj = obj_find_first(); obj != nullptr; obj = obj_find_next()) {
+                if (obj == obj_dude || obj->sid == -1 || PID_TYPE(obj->pid) != OBJ_TYPE_CRITTER) continue;
+                Proto* proto;
+                if (proto_ptr(obj->pid, &proto) == -1) continue;
+                SDL_Log("autotest: %s critter pid %x barter=%d", name, obj->pid, (proto->critter.data.flags & CRITTER_BARTER) != 0);
+                if ((proto->critter.data.flags & CRITTER_BARTER) != 0) {
+                    trader = obj;
+                    break;
+                }
+            }
+            if (only != nullptr) break;
+        }
+        if (trader != nullptr) {
+            SDL_Log("autotest: barter with pid %x", trader->pid);
+            // Something to sell: the pistol and a few of the stackable items are in the pack.
+            obj_move_to_tile(obj_dude, trader->tile + 2, trader->elevation, nullptr);
+            schedule(2000, barterTimer);
+            gdialog_enter(trader, 0);
+            game_user_wants_to_quit = 0;
+        } else {
+            SDL_Log("autotest: no trader found");
+        }
+    }
     bottomScreenSetTest(0, 0, 1.0f);
     return rc == 0;
 }
