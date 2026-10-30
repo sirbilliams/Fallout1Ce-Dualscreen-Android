@@ -171,7 +171,20 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
 
     Config resolutionConfig;
     if (config_init(&resolutionConfig)) {
-        if (config_load(&resolutionConfig, "f1_res.ini", false)) {
+        // The Windows "Fallout 1 High Resolution Patch" ships its own f1_res.ini
+        // (Steam installs it, 1024x768 fullscreen). It is not meant for this
+        // port, so a file with the patch's keys is ignored; a hand-written
+        // f1_res.ini with only SCR_WIDTH/SCR_HEIGHT still works.
+        bool loaded = config_load(&resolutionConfig, "f1_res.ini", false);
+        if (loaded) {
+            int ignored;
+            if (config_get_value(&resolutionConfig, "MAIN", "GRAPHICS_MODE", &ignored)
+                || config_get_value(&resolutionConfig, "MAIN", "UAC_AWARE", &ignored)
+                || config_get_value(&resolutionConfig, "INPUT", "EXTRA_WIN_MSG_CHECKS", &ignored)) {
+                loaded = false;
+            }
+        }
+        if (loaded) {
             int screenWidth;
             if (config_get_value(&resolutionConfig, "MAIN", "SCR_WIDTH", &screenWidth)) {
                 video_options.width = std::max(screenWidth, 640);
@@ -195,6 +208,15 @@ int game_init(const char* windowTitle, bool isMapper, int font, int flags, int a
             }
         }
         config_exit(&resolutionConfig);
+    }
+
+    // Port-owned override: fallout.cfg [screen] width / height.
+    {
+        int w, h;
+        if (config_get_value(&game_config, "screen", "width", &w) && config_get_value(&game_config, "screen", "height", &h)) {
+            video_options.width = std::max(w, 640);
+            video_options.height = std::max(h, 480);
+        }
     }
 
     initWindow(&video_options, flags);

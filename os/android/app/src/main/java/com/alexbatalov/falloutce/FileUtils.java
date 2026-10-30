@@ -12,10 +12,23 @@ import java.io.OutputStream;
 
 public class FileUtils {
 
+    private static boolean isWindowsHiResPatchFile(String name) {
+        if (name == null) {
+            return false;
+        }
+        final String lower = name.toLowerCase(java.util.Locale.ROOT);
+        return lower.equals("f1_res.ini") || lower.equals("f1_res.dll") || lower.equals("ddraw.dll");
+    }
+
     static boolean copyRecursively(ContentResolver contentResolver, DocumentFile src, File dest) {
         final DocumentFile[] documentFiles = src.listFiles();
         for (final DocumentFile documentFile : documentFiles) {
             if (documentFile.isFile()) {
+                if (isWindowsHiResPatchFile(documentFile.getName())) {
+                    // The Windows hi-res patch (f1_res.ini, ddraw.dll, f1_res.dll)
+                    // is useless here and its f1_res.ini would fix the resolution.
+                    continue;
+                }
                 if (!copyFile(contentResolver, documentFile, new File(dest, documentFile.getName()))) {
                     return false;
                 }
