@@ -1,4 +1,5 @@
 #include "game/pipboy.h"
+#include "mui/mui.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -176,6 +177,7 @@ typedef struct PipboyBomb {
 } PipboyBomb;
 
 static int StartPipboy(int intent);
+static int mui_pipboy_sync(int keyCode);
 static void EndPipboy();
 static void pip_days_left(int days);
 static void pip_num(int value, int digits, int x, int y);
@@ -529,6 +531,51 @@ static unsigned char holo_flag;
 static unsigned char stat_flag;
 
 // 0x486A80
+// Feeds the touch Pip-Boy with what the classic lists would show.
+static int mui_pipboy_sync(int keyCode)
+{
+    if (!muiIsEnabled()) {
+        return keyCode;
+    }
+
+    MuiPipboyView view;
+    view.status = getmsg(&pipboy_message_file, &pipmesg, 202);
+    for (int location = 0; location < QUEST_LOCATION_COUNT; location += 1) {
+        for (int quest = 0; quest < 9; quest++) {
+            int value = game_global_vars[sthreads[location][quest]];
+            if (sthreads[location][quest] == GVAR_FIND_WATER_CHIP) {
+                value = 1;
+            }
+            if (value > 0) {
+                view.quests.push_back(getmsg(&pipboy_message_file, &pipmesg, 700 + 10 * location));
+                break;
+            }
+        }
+    }
+    for (int index = 0; index < HOLODISK_COUNT; index++) {
+        if (game_global_vars[holodisks[index]] != 0) {
+            view.disks.push_back(getmsg(&pipboy_message_file, &pipmesg, 400 + index));
+        }
+    }
+    for (int option = 1; option < PIPBOY_REST_DURATION_COUNT_WITHOUT_PARTY + 1; option++) {
+        view.rest.push_back(getmsg(&pipboy_message_file, &pipmesg, 301 + option));
+    }
+    view.canRest = critter_can_obj_dude_rest();
+    char line[64];
+    snprintf(line, sizeof(line), "HP %d/%d", critter_get_hits(obj_dude), stat_level(obj_dude, STAT_MAXIMUM_HIT_POINTS));
+    view.hp = line;
+    int month;
+    int day;
+    int year;
+    game_time_date(&month, &day, &year);
+    snprintf(line, sizeof(line), "%02d:%02d   %d/%d/%d", game_time_hour() / 100, game_time_hour() % 100, day, month, year);
+    view.place = line;
+    muiPipboyUpdate(view);
+
+    int choice = muiPipboyTakeChoice();
+    return choice != -1 ? choice : keyCode;
+}
+
 int pipboy(int intent)
 {
     intent = StartPipboy(intent);
@@ -542,7 +589,7 @@ int pipboy(int intent)
     while (true) {
         sharedFpsLimiter.mark();
 
-        int keyCode = get_input();
+        int keyCode = mui_pipboy_sync(get_input());
 
         if (intent == PIPBOY_OPEN_INTENT_REST) {
             keyCode = 504;
@@ -596,6 +643,7 @@ int pipboy(int intent)
         sharedFpsLimiter.throttle();
     }
 
+    muiPipboyHide();
     EndPipboy();
 
     return 0;

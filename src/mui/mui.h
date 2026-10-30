@@ -355,6 +355,27 @@ void muiLoadSaveShow(bool saving, const std::vector<MuiSaveSlot>& slots, int cur
 void muiLoadSaveHide();
 int muiLoadSaveTakeChoice();
 
+// Conversation (mui_dialogue.cc), fed every frame by the classic dialogue loop.
+// TakeChoice: answer index 0.., 100 = barter, -1 nothing.
+void muiDialogueUpdate(const char* name, const char* reply, const std::vector<std::string>& options, bool barter);
+int muiDialogueTakeChoice();
+void muiDialogueHide();
+
+// Pip-Boy 2000 (mui_pipboy.cc), fed every frame by the classic Pip-Boy loop.
+// TakeChoice: a key code of that loop (500..504 tabs, 506.. lines), -1 none.
+struct MuiPipboyView {
+    std::string status;
+    std::string place;
+    std::string hp;
+    std::vector<std::string> quests;
+    std::vector<std::string> disks;
+    std::vector<std::string> rest;
+    bool canRest = false;
+};
+void muiPipboyUpdate(const MuiPipboyView& view);
+int muiPipboyTakeChoice();
+void muiPipboyHide();
+
 // Called every frame of `muiRunModal` (autotest hook).
 void muiSetModalTick(void (*tick)());
 

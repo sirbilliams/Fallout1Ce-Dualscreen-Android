@@ -12,6 +12,8 @@
 
 #include "bottom_screen.h"
 #include "game/inventry.h"
+#include "game/loadsave.h"
+#include "game/pipboy.h"
 #include "game/item.h"
 #include "game/object.h"
 #include "mobile_contracts.h"
@@ -119,6 +121,43 @@ namespace {
 
 bool scenes(const char* dir, int width, int height, bool game);
 
+namespace {
+
+    std::string gLiveDir;
+    int gLiveWidth = 0;
+    int gLiveHeight = 0;
+    int gLiveStep = 0;
+    std::string gLiveName;
+    float gLiveX = 0.75f;
+    float gLiveY = 0.945f;
+
+    // Runs on SDL's timer thread while the classic load loop is blocking the
+    // game thread: captures the touch picker, then taps its Cancel button.
+    Uint32 liveTimer(Uint32, void*)
+    {
+        SDL_Event event;
+        SDL_zero(event);
+        event.tfinger.touchId = kMobileBottomTouchId;
+        event.tfinger.fingerId = kMobileBottomTouchId + 2;
+        event.tfinger.x = gLiveX;
+        event.tfinger.y = gLiveY;
+        if (gLiveStep++ == 0) {
+            const unsigned char* bottom = bottomScreenTestFrame();
+            if (bottom != nullptr) {
+                saveRgba(bottom, gLiveWidth, gLiveHeight, gLiveDir + "/" + gLiveName + "-bottom.bmp");
+            }
+            event.type = SDL_FINGERDOWN;
+            event.tfinger.pressure = 1.0f;
+            SDL_PushEvent(&event);
+            return 200;
+        }
+        event.type = SDL_FINGERUP;
+        SDL_PushEvent(&event);
+        return 0;
+    }
+
+} // namespace
+
 bool devAutotestRun()
 {
     if (!contracts()) return false;
@@ -139,7 +178,9 @@ bool devAutotestRun()
 
     if (!captureScene(dir, "00-dashboard", width, height)) return false;
 
-    return scenes(dir, width, height, false);
+    bool ok = scenes(dir, width, height, false);
+    bottomScreenSetTest(0, 0, 1.0f);
+    return ok;
 }
 
 bool devAutotestGameRun()
@@ -162,7 +203,36 @@ bool devAutotestGameRun()
         }
     }
     if (!captureScene(dir, "10-dashboard-ingame", width, height)) return false;
-    return scenes(dir, width, height, true);
+    if (!scenes(dir, width, height, true)) return false;
+
+    // The real load screen: the classic loop runs with the touch picker over
+    // it; a timer taps Cancel (the real save slots are listed, none loaded).
+    gLiveDir = dir;
+    gLiveWidth = width;
+    gLiveHeight = height;
+    SDL_InitSubSystem(SDL_INIT_TIMER);
+    gLiveStep = 0;
+    gLiveName = "05b-loadsave-live";
+    gLiveX = 0.75f;
+    gLiveY = 0.945f;
+    if (SDL_AddTimer(2500, liveTimer, nullptr) == 0) {
+        SDL_Log("autotest: no timer: %s", SDL_GetError());
+        return false;
+    }
+    int rc = LoadGame(LOAD_SAVE_MODE_NORMAL);
+    SDL_Log("autotest: LoadGame returned %d (0 = cancelled by touch)", rc);
+
+    // The real Pip-Boy: the classic loop runs with the touch face over it; the
+    // timer captures it and taps Back.
+    gLiveStep = 0;
+    gLiveName = "07b-pipboy-live";
+    gLiveX = 0.9f;
+    gLiveY = 0.065f;
+    SDL_AddTimer(2500, liveTimer, nullptr);
+    int pipRc = pipboy(PIPBOY_OPEN_INTENT_UNSPECIFIED);
+    SDL_Log("autotest: pipboy returned %d", pipRc);
+    bottomScreenSetTest(0, 0, 1.0f);
+    return rc == 0;
 }
 
 bool scenes(const char* dir, int width, int height, bool game)
@@ -188,7 +258,6 @@ bool scenes(const char* dir, int width, int height, bool game)
         frames(2);
     }
 
-    bottomScreenSetTest(0, 0, 1.0f);
     return true;
 }
 

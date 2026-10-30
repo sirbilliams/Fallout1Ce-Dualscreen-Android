@@ -1,4 +1,5 @@
 #include "game/gdialog.h"
+#include "mui/mui.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -138,6 +139,7 @@ static int gdAddReviewReplyStr(const char* string);
 static int gdAddReviewOptionChosen(int messageListId, int messageId);
 static int gdAddReviewOptionChosenStr(const char* string);
 static int gDialogProcess();
+static int mui_dialogue_sync(int keyCode);
 static void gDialogProcessCleanup();
 static int gDialogProcessChoice(int a1);
 static int gDialogProcessInit();
@@ -1283,7 +1285,7 @@ static int gDialogProcess()
     for (;;) {
         sharedFpsLimiter.mark();
 
-        int keyCode = get_input();
+        int keyCode = mui_dialogue_sync(get_input());
 
         convertMouseWheelToArrowKey(&keyCode);
 
@@ -1302,6 +1304,7 @@ static int gDialogProcess()
         } else {
             if (dialogue_switch_mode == 3) {
                 dialogue_state = 4;
+                muiDialogueHide();
                 barter_inventory(dialogueWindow, dialog_target, peon_table_obj, barterer_table_obj, gdBarterMod);
                 dialogue_barter_cleanup_tables();
 
@@ -1400,6 +1403,7 @@ static int gDialogProcess()
     }
 
     gdReenterLevel -= 1;
+    muiDialogueHide();
 
     if (gdReenterLevel == 0) {
         if (gDialogProcessExit() == -1) {
@@ -1408,6 +1412,38 @@ static int gDialogProcess()
     }
 
     return 0;
+}
+
+// Feeds the touch conversation screen and turns its answer into a key.
+static int mui_dialogue_sync(int keyCode)
+{
+    if (!muiIsEnabled() || dialog_target == nullptr || gdialog_state == 0) {
+        return keyCode;
+    }
+
+    std::vector<std::string> options;
+    for (int index = 0; index < gdNumOptions && index < 9; index++) {
+        options.push_back(dialogBlock.options[index].text);
+    }
+
+    bool barter = false;
+    if (PID_TYPE(dialog_target->pid) == OBJ_TYPE_CRITTER) {
+        Proto* proto;
+        if (proto_ptr(dialog_target->pid, &proto) != -1) {
+            barter = (proto->critter.data.flags & CRITTER_BARTER) != 0;
+        }
+    }
+
+    muiDialogueUpdate(critter_name(dialog_target), dialogBlock.replyText, options, barter);
+
+    int choice = muiDialogueTakeChoice();
+    if (choice >= 0 && choice < 9) {
+        return '1' + choice;
+    }
+    if (choice == 100) {
+        return KEY_LOWERCASE_B;
+    }
+    return keyCode;
 }
 
 // 0x43EEEC

@@ -692,6 +692,7 @@ int SaveGame(int mode)
                 doubleClickSlot = -1;
             }
 
+            renderPresent();
             while (elapsed_time(tick) < 1000 / 24) {
             }
         }
@@ -1200,6 +1201,7 @@ int LoadGame(int mode)
                 doubleClickSlot = -1;
             }
 
+            renderPresent();
             while (elapsed_time(time) < 1000 / 24) { }
         }
 
